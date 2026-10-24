@@ -66,20 +66,26 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(action, "UNMUTE")
         badge.assert_not_called()
 
-    def test_lower_confidence_ad_still_needs_confirmation(self):
+    def test_ad_below_single_frame_threshold_still_needs_confirmation(self):
         d = self.detector(Verdict("program", .97, "football"),
-                          Verdict("ad", .89), Verdict("ad", .88))
+                          Verdict("ad", .84), Verdict("ad", .84))
         d.process("tv", b"show", self.context)
         self.assertEqual(d.process("tv", b"ad1", self.context)[0], "UNMUTE")
         self.assertEqual(d.process("tv", b"ad2", self.context)[0], "MUTE")
 
-    def test_uncertain_transition_does_not_use_single_frame_rule(self):
+    def test_ad_after_uncertain_transition_mutes_with_known_program(self):
         d = self.detector(Verdict("program", .97, "football"),
-                          Verdict("uncertain", .8), Verdict("ad", .95), Verdict("ad", .94))
+                          Verdict("uncertain", .8), Verdict("ad", .88))
         d.process("tv", b"show", self.context)
         d.process("tv", b"transition", self.context)
-        self.assertEqual(d.process("tv", b"ad1", self.context)[0], "UNMUTE")
-        self.assertEqual(d.process("tv", b"ad2", self.context)[0], "MUTE")
+        self.assertEqual(d.process("tv", b"ad1", self.context)[0], "MUTE")
+
+    def test_single_ad_does_not_mute_when_model_reports_program_change(self):
+        d = self.detector(Verdict("program", .97, "football"),
+                          Verdict("ad", .95, program_changed=True),
+                          Verdict("program", .95, "basketball", program_changed=True))
+        d.process("tv", b"show", self.context)
+        self.assertEqual(d.process("tv", b"ambiguous-switch", self.context)[0], "UNMUTE")
 
     def test_stale_duplicate_frame_releases_detector_mute(self):
         d = self.detector(Verdict("ad", .95), Verdict("ad", .95))
@@ -125,9 +131,9 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.process("tv", b"one", self.context)[0], "UNMUTE")
         self.assertEqual(d.process("tv", b"two", self.context)[0], "UNMUTE")
 
-    def test_program_start_is_first_observation_and_ad_start_needs_two_votes(self):
+    def test_program_start_is_first_observation_and_low_confidence_ad_needs_two_votes(self):
         d = self.detector(Verdict("program", .95, "football"),
-                          Verdict("ad", .89), Verdict("ad", .91))
+                          Verdict("ad", .84), Verdict("ad", .84))
         d.process("tv", b"show", self.context)
         self.assertEqual(d.state("tv").first_program_seen_at, 1000)
         self.now = 1100
@@ -149,6 +155,13 @@ class DetectorTests(unittest.TestCase):
         s.ad_starts = [100, 400, 1000]
         self.now = 1250
         self.assertEqual(d.next_interval("tv"), 5)
+
+    def test_uncertain_frame_requests_faster_followup_without_muting(self):
+        d = self.detector(Verdict("program", .95, "football"),
+                          Verdict("uncertain", .55))
+        d.process("tv", b"show", self.context)
+        self.assertEqual(d.process("tv", b"cutaway", self.context)[0], "UNMUTE")
+        self.assertEqual(d.next_interval("tv"), 2)
 
     def test_muted_break_checks_slowly_but_confirms_program_return_quickly(self):
         d = self.detector(Verdict("ad", .95), Verdict("ad", .95),

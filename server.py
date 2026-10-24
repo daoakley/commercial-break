@@ -16,7 +16,7 @@ import sponsored_badge
 
 MAX_FRAME_BYTES = 1_000_000
 MIN_CONFIDENCE = 0.70
-SINGLE_FRAME_AD_CONFIDENCE = 0.90
+SINGLE_FRAME_AD_CONFIDENCE = 0.85
 STALE_MUTE_SECONDS = 60
 
 
@@ -51,17 +51,10 @@ class TVState:
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
-SYSTEM_PROMPT = """You classify ONE television screenshot as program, ad, or uncertain.
-Use visible evidence and the supplied viewing context. A logo, score graphic,
-or sponsorship inside the program is not by itself a commercial. An abrupt switch
-from the established program to a product/service pitch is strong ad evidence.
-Black, loading, menus, and ambiguous frames are uncertain. Do not guess.
-If a frame is clearly a different show or channel than the known program,
-classify it as program, not as an ad merely because the scene changed, and set
-program_changed to true. A normal cut within the same show is not a change.
-Respond with exactly one JSON object containing label (ad|program|uncertain),
-confidence (0..1), program (stable description including show/channel if visible),
-evidence (one short sentence), and program_changed (boolean)."""
+SYSTEM_PROMPT = """Classify one TV frame as ad, program, or uncertain using the known program and recent observations.
+Commercial breaks include station promos, trailers, bumpers, and sponsor pitches, even without a product logo or price. A standalone advertiser brand, product shot, URL, phone number, price, or call to action, *unrelated to the established show*, is strong ad evidence, especially after the show has cut away. Use high ad confidence for an unambiguous external product pitch; do not require two frames or a full banner. Two successive unrelated scenes during one interruption strengthen ad evidence.
+Do not label an in-show sponsor bug, sports ticker, news lower third, show title/website, product used within an editorial segment, or ordinary scene cut as an ad just because a brand or text is present. Black frames, menus, guide, loading, and genuinely ambiguous images are uncertain. If a clear user channel/show switch is evident, classify the new show as program and set program_changed true. Do not infer a user switch solely from one changed scene. Give calibrated confidence, not automatic 0.95.
+Respond with exactly one JSON object containing label (ad|program|uncertain), confidence (0..1), program, evidence, program_changed (boolean)."""
 
 
 class VisionClient:
@@ -119,7 +112,7 @@ class Detector:
             if state.ad_streak or state.program_streak == 1:
                 return 2
             if state.last_verdict == "uncertain":
-                return 3
+                return 2
             starts = state.ad_starts
             if len(starts) >= 3:
                 gaps = [b - a for a, b in zip(starts, starts[1:])]
@@ -185,7 +178,6 @@ class Detector:
                     verdict = Verdict("uncertain", evidence="model error: " + type(exc).__name__)
                     state.model_unavailable = True
             state.updated_at = now
-            previous_label = state.last_verdict
             state.last_verdict = verdict.label
             if state.model_unavailable:
                 state.muted_by_detector = False
@@ -234,7 +226,7 @@ class Detector:
                 verdict.label == "ad" and confident
                 and verdict.confidence >= SINGLE_FRAME_AD_CONFIDENCE
                 and bool(state.program)
-                and previous_label == "program"
+                and not verdict.program_changed
             )
             if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program or badge_hit):
                 state.muted_by_detector = True
