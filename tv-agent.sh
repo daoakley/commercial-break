@@ -37,6 +37,13 @@ get_mute() {
     /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager GetSpeakerMute 2>/dev/null
 }
 
+current_app_id() {
+  # Tizen's foreground-app key lets app-specific rules follow app switches.
+  /usr/bin/vconftool get memory/appfw/current_fullscreen_appid 2>/dev/null |
+    sed -n 's/^[^,]*, value = \([A-Za-z0-9._-]*\) (String)$/\1/p' |
+    head -n 1
+}
+
 set_mute() {
   /usr/bin/busctl --system --timeout=2 call org.tizen.speakermanager \
     /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b "$1" >/dev/null
@@ -112,11 +119,13 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   fi
 
   request_ok=1
+  observed_app=$(current_app_id)
+  if [ -z "$observed_app" ]; then observed_app=$TV_APP; fi
   action=$(curl -fsS --connect-timeout 2 --max-time 38 -D "$RESPONSE_HEADERS" -X POST \
     -H "Authorization: Bearer $FRAME_TOKEN" \
     -H "Content-Type: image/png" \
     -H "X-TV-ID: $TV_ID" \
-    -H "X-TV-App: $TV_APP" \
+    -H "X-TV-App: $observed_app" \
     -H "X-TV-Channel: $TV_CHANNEL" \
     -H "X-TV-Title: $TV_TITLE" \
     -H "X-TV-Local-Time: $(date '+%Y-%m-%dT%H:%M:%S%z')" \
