@@ -131,7 +131,7 @@ The detector tracks recent program and ad observations in memory. A matched YouT
 
 If capture, the network, Docker, or the model fails, the helper releases the mute and active backlight change **that it owns**. The card has a renewable lease and disappears if the helper stops renewing it. A watchdog retries restoration after an unexpected helper stop. The viewer can always use the remote. The helper never pauses playback or changes channels. Test all of these behaviors before extended use on another TV.
 
-The card covers the display screenshot, so it briefly clears for each capture and then returns. A single test on the owner's TV measured about 0.67 seconds uncovered, but flashes and latency vary. The direct video-plane capture path refused a protected YouTube TV stream, so the display screenshot remains the verified source for that app. Claude classifications can miss ads or identify them late. This is a prototype, not a guarantee that every commercial will be hidden.
+The card covers the display screenshot, so it briefly clears for each capture and then returns. The TV helper now restores the card about 225 ms after starting native capture, while the PNG finishes writing. An isolated 200 ms test measured about 0.30 seconds uncovered and saved a valid program frame; a 100 ms test captured the card instead. A live post-update ad frame was usable, but flashes and timing vary. The direct video-plane capture path refused a protected YouTube TV stream, so the display screenshot remains the verified source for that app. Claude classifications can miss ads or identify them late. This is a prototype, not a guarantee that every commercial will be hidden.
 
 ## Privacy and repository contents
 
