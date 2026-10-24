@@ -126,6 +126,38 @@ class DetectorTests(unittest.TestCase):
         d.process("tv", b"ad2", self.context)
         self.assertEqual(d.process("tv", b"home", dict(self.context, app="home"))[0], "UNMUTE")
 
+    def test_channel_change_inside_youtube_tv_releases_cover_and_cadence(self):
+        old = dict(self.context, channel="TruTV")
+        new = dict(self.context, channel="TBS")
+        d = self.detector(Verdict("program", .95, "Jaws"), Verdict("ad", .95))
+        d.process("tv", b"jaws", old)
+        self.assertEqual(d.process("tv", b"commercial", old)[0], "MUTE")
+        action, verdict = d.process("tv", b"new-channel", new)
+        self.assertEqual(action, "UNMUTE")
+        self.assertEqual(verdict.evidence, "channel changed")
+        self.assertEqual(d.state("tv").channel, "TBS")
+        self.assertEqual(d.state("tv").program, "")
+        self.assertEqual(d.state("tv").ad_starts, [])
+
+    def test_newly_available_title_releases_cover(self):
+        d = self.detector(Verdict("program", .95, "Jaws"), Verdict("ad", .95))
+        d.process("tv", b"jaws", self.context)
+        self.assertEqual(d.process("tv", b"commercial", self.context)[0], "MUTE")
+        action, verdict = d.process("tv", b"new-show", dict(self.context, title="New Show"))
+        self.assertEqual((action, verdict.evidence), ("UNMUTE", "title changed"))
+
+    def test_two_moderate_new_program_frames_release_false_cover(self):
+        d = self.detector(Verdict("program", .95, "Jaws"),
+                          Verdict("ad", .95),
+                          Verdict("program", .72, "new action show", program_changed=True),
+                          Verdict("program", .60, "new action show", program_changed=True))
+        d.process("tv", b"jaws", self.context)
+        self.assertEqual(d.process("tv", b"false-ad", self.context)[0], "MUTE")
+        self.assertEqual(d.process("tv", b"truck", self.context)[0], "MUTE")
+        self.assertEqual(d.process("tv", b"car", self.context)[0], "UNMUTE")
+        self.assertEqual(d.state("tv").program, "new action show")
+        self.assertEqual(d.state("tv").ad_starts, [])
+
     def test_uncertain_frames_never_start_a_mute(self):
         d = self.detector(Verdict("uncertain", 1.0), Verdict("ad", .6))
         self.assertEqual(d.process("tv", b"one", self.context)[0], "UNMUTE")

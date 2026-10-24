@@ -17,6 +17,8 @@ import sponsored_badge
 MAX_FRAME_BYTES = 1_000_000
 MIN_CONFIDENCE = 0.70
 SINGLE_FRAME_AD_CONFIDENCE = 0.85
+POSSIBLE_PROGRAM_CHANGE_CONFIDENCE = 0.60
+STRONG_PROGRAM_CHANGE_CONFIDENCE = 0.80
 STALE_MUTE_SECONDS = 60
 
 
@@ -32,6 +34,7 @@ class Verdict:
 @dataclass
 class TVState:
     app: str = ""
+    channel: str = ""
     title: str = ""
     program: str = ""
     first_program_seen_at: float = 0.0
@@ -52,8 +55,8 @@ class TVState:
 
 
 SYSTEM_PROMPT = """Classify one TV frame as ad, program, or uncertain using the known program and recent observations.
-Commercial breaks include station promos, trailers, bumpers, and sponsor pitches, even without a product logo or price. A standalone advertiser brand, product shot, URL, phone number, price, or call to action, *unrelated to the established show*, is strong ad evidence, especially after the show has cut away. Use high ad confidence for an unambiguous external product pitch; do not require two frames or a full banner. Two successive unrelated scenes during one interruption strengthen ad evidence.
-Do not label an in-show sponsor bug, sports ticker, news lower third, show title/website, product used within an editorial segment, or ordinary scene cut as an ad just because a brand or text is present. Black frames, menus, guide, loading, and genuinely ambiguous images are uncertain. If a clear user channel/show switch is evident, classify the new show as program and set program_changed true. Do not infer a user switch solely from one changed scene. Give calibrated confidence, not automatic 0.95.
+A scheduled new show or in-app channel change can occur without a change in app ID or supplied title. The prior known program, earlier ad labels, and a scene unlike the prior show are not ad evidence by themselves. A coherent dramatic, comedic, documentary, sports, or news scene is program even if it is clearly a different show; set program_changed true when a show/channel switch is plausible. A network logo alone is not an ad cue.
+Commercials include station promos, trailers, bumpers, and sponsor pitches, but require identifiable promotional intent in the current frame: a product or service pitch, advertiser brand, price, URL, phone number, call to action, or an obvious promo/trailer cue. Use high ad confidence for an unambiguous external pitch; do not require a full banner. Do not label an in-show sponsor bug, sports ticker, news lower third, show title/website, product used within an editorial segment, or ordinary scene cut as an ad just because a brand or text is present. If this frame cannot distinguish a promo from a new show, use uncertain. Black frames, menus, guide, and loading are uncertain. Give calibrated confidence, not automatic 0.95.
 Respond with exactly one JSON object containing label (ad|program|uncertain), confidence (0..1), program, evidence, program_changed (boolean)."""
 
 
@@ -131,9 +134,14 @@ class Detector:
         now = self.clock()
         with state.lock:
             app = context.get("app", "")
+            channel = context.get("channel", "")
             title = context.get("title", "")
-            if state.app and (app != state.app or (title and state.title and title != state.title)):
+            app_changed = bool(state.app and app != state.app)
+            channel_changed = bool(channel and channel != state.channel and state.program)
+            title_changed = bool(title and title != state.title and state.program)
+            if app_changed or channel_changed or title_changed:
                 state.app = app
+                state.channel = channel
                 state.title = title
                 state.program = ""
                 state.first_program_seen_at = 0.0
@@ -147,8 +155,12 @@ class Detector:
                 state.muted_by_detector = False
                 state.model_unavailable = False
                 state.updated_at = now
-                return "UNMUTE", Verdict("uncertain", evidence="app changed")
+                reason = ("app changed" if app_changed else
+                          "channel changed" if channel_changed else "title changed")
+                return "UNMUTE", Verdict("uncertain", evidence=reason)
             state.app = app
+            if channel:
+                state.channel = channel
             if title:
                 state.title = title
             digest = hashlib.sha256(png).hexdigest()
@@ -191,9 +203,14 @@ class Detector:
             })
             state.recent_observations = state.recent_observations[-6:]
             confident = verdict.confidence >= MIN_CONFIDENCE
-            if verdict.label == "program" and confident and verdict.program_changed and state.program:
+            possible_new_program = (verdict.label == "program" and verdict.program_changed
+                                    and bool(state.program)
+                                    and verdict.confidence >= POSSIBLE_PROGRAM_CHANGE_CONFIDENCE)
+            if possible_new_program:
                 state.switch_streak += 1
-                if state.switch_streak >= 2 or state.muted_by_detector:
+                if (state.switch_streak >= 2
+                        or (state.muted_by_detector
+                            and verdict.confidence >= STRONG_PROGRAM_CHANGE_CONFIDENCE)):
                     state.program = verdict.program
                     state.first_program_seen_at = now
                     state.ad_candidate_at = state.last_ad_at = state.last_ad_end_at = 0.0

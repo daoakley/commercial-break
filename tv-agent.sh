@@ -12,7 +12,7 @@ CAPTURE_FILE=/home/owner/share/tmp/sdk_tools/codex-display-sample.png.png
 STATE_DIR=/run/codex-commercial-muter
 INTERVAL_SECONDS=${INTERVAL_SECONDS:-3}
 TV_ID=${TV_ID:-frame-tv}
-TV_APP=${TV_APP:-unknown}
+TV_APP=${TV_APP:-com.samsung.tv.cobalt-yttv}
 TV_CHANNEL=${TV_CHANNEL:-}
 TV_TITLE=${TV_TITLE:-}
 MAX_FRAMES=${MAX_FRAMES:-0}
@@ -147,6 +147,11 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   fi
   rm -f "$RESPONSE_HEADERS"
 
+  observed_action=
+  if [ "${OBSERVE_ONLY:-0}" = 1 ]; then
+    observed_action=$action
+    action=UNMUTE
+  fi
   case "$action" in
     MUTE)
       if [ -f "$OWNED" ]; then
@@ -183,7 +188,7 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
       release_owned_backlight || true
       ;;
   esac
-  echo "$(date '+%H:%M:%S') decision=$action"
+  echo "$(date '+%H:%M:%S') decision=$action${observed_action:+ observed=$observed_action}"
   count=$((count + 1))
   date +%s > "$HEARTBEAT"
   if [ "$request_ok" -eq 0 ]; then
