@@ -1,5 +1,18 @@
 # Commercial Break handoff — 24 October 2026
 
+## Current incident — experimental trial stopped
+
+At approximately 18:41 EDT the owner reported a black-screen/program-image
+loop. The fast helper was stopped and panel mute, owned speaker mute and
+brightness were released. Do not automatically restart the failed fast
+configuration. The log showed continuous UNMUTE decisions during
+the reported period. The specific capture/display cause remains unproven.
+Next-start settings now select v1, with FAST_MODE, CAPTURE_PERSISTENT and
+OVERLAY_WARM disabled, and the original one-shot capture binary restored.
+The classifier/navigation safeguards remain available. Confirm the physical
+picture is steady before resuming any helper. Earlier sections describe the
+implementation and measurements, not a currently running fast configuration.
+
 Commercial Break is a free experimental commercial muter for one owner's 2022 Samsung Frame (`QN65LS03BAFXZA`, `T-PTMAKUC-1720.7`, Tizen 6.5). This repository has source and reproduction steps. The owner's live TV uses the same core detector source with private configuration, TV-specific binaries, and local capture logs kept outside Git. Read [README.md](../README.md) before changing the implementation.
 
 ## Working system

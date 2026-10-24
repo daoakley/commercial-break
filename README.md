@@ -8,6 +8,12 @@ This repository shares **source and reproduction steps**, not an installable Sam
 
 For the asynchronous fast path, context model, navigation reset and measured limits, see [Detection design](docs/DETECTION_DESIGN.md). The sequential endpoint remains the default for first-time setup. Also see [the Astra handoff](docs/ASTRA_HANDOFF.md) and the [issue tracker](https://github.com/daoakley/commercial-break/issues).
 
+**Experimental fast-path trial suspended:** the owner reported a repeated
+black-screen/program-image loop despite UNMUTE decisions. Keep fast,
+persistent-capture and warm-overlay modes disabled until the display-side
+regression is isolated. The draft documents both the timing gains and this
+failure; it is not a validated release.
+
 ## What was tested
 
 The complete capture and control path worked on a **2022 Samsung Frame QN65LS03BAFXZA, firmware T-PTMAKUC-1720.7**, running Tizen 6.5 and .NET Core 3.1. The screenshot helper captured YouTube TV and Home-screen frames. During a live YouTube TV ad break, the helper muted, dimmed, displayed the card, and restored the original active backlight and sound when the program returned. This is one owner's result, not a compatibility claim for other models or firmware. Other apps and protected video paths may behave differently.
