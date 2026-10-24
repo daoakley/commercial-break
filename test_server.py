@@ -43,6 +43,20 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.process("tv", b"show", self.context)[0], "UNMUTE")
         self.assertEqual(d.process("tv", b"ad1", self.context)[0], "MUTE")
 
+    def test_strong_ad_mutes_after_unnamed_program_was_observed(self):
+        d = self.detector(Verdict("program", .91, ""),
+                          Verdict("ad", .96, evidence="external product call to action"))
+        self.assertEqual(d.process("tv", b"unnamed-show", self.context)[0], "UNMUTE")
+        self.assertEqual(d.state("tv").first_program_seen_at, 1000)
+        self.assertEqual(d.process("tv", b"clear-ad", self.context)[0], "MUTE")
+
+    def test_named_metadata_change_resets_after_unnamed_program(self):
+        d = self.detector(Verdict("program", .91, ""))
+        d.process("tv", b"unnamed-show", self.context)
+        action, verdict = d.process("tv", b"new-title", dict(self.context, title="New Show"))
+        self.assertEqual((action, verdict.evidence), ("UNMUTE", "title changed"))
+        self.assertEqual(d.state("tv").first_program_seen_at, 0)
+
     def test_strong_ad_without_known_program_still_needs_confirmation(self):
         d = self.detector(Verdict("ad", .97), Verdict("ad", .97))
         self.assertEqual(d.process("tv", b"ad1", self.context)[0], "UNMUTE")

@@ -137,8 +137,10 @@ class Detector:
             channel = context.get("channel", "")
             title = context.get("title", "")
             app_changed = bool(state.app and app != state.app)
-            channel_changed = bool(channel and channel != state.channel and state.program)
-            title_changed = bool(title and title != state.title and state.program)
+            # A program may have been observed even when the vision service
+            # cannot name it. The timestamp is the reliable context marker.
+            channel_changed = bool(channel and channel != state.channel and state.first_program_seen_at)
+            title_changed = bool(title and title != state.title and state.first_program_seen_at)
             if app_changed or channel_changed or title_changed:
                 state.app = app
                 state.channel = channel
@@ -204,7 +206,7 @@ class Detector:
             state.recent_observations = state.recent_observations[-6:]
             confident = verdict.confidence >= MIN_CONFIDENCE
             possible_new_program = (verdict.label == "program" and verdict.program_changed
-                                    and bool(state.program)
+                                    and bool(state.first_program_seen_at)
                                     and verdict.confidence >= POSSIBLE_PROGRAM_CHANGE_CONFIDENCE)
             if possible_new_program:
                 state.switch_streak += 1
@@ -242,7 +244,7 @@ class Detector:
             strong_ad_against_known_program = (
                 verdict.label == "ad" and confident
                 and verdict.confidence >= SINGLE_FRAME_AD_CONFIDENCE
-                and bool(state.program)
+                and bool(state.first_program_seen_at)
                 and not verdict.program_changed
             )
             if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program or badge_hit):
@@ -313,9 +315,12 @@ class Handler(BaseHTTPRequestHandler):
             "local_time": self.headers.get("X-TV-Local-Time", "")[:80],
         }
         tv_id = self.headers.get("X-TV-ID", "frame-tv")[:80]
+        started = time.monotonic()
         action, verdict = self.detector.process(tv_id, png, context)
         next_interval = self.detector.next_interval(tv_id)
-        print(f"decision={action} label={verdict.label} confidence={verdict.confidence:.2f}", flush=True)
+        elapsed_ms = round((time.monotonic() - started) * 1000)
+        print(f"decision={action} label={verdict.label} confidence={verdict.confidence:.2f} "
+              f"program_changed={int(verdict.program_changed)} classify_ms={elapsed_ms}", flush=True)
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(action)))
