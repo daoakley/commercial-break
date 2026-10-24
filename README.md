@@ -2,6 +2,8 @@
 
 Commercial Break is an experimental commercial muter for a Samsung Frame TV. A temporary TV-side helper captures a 480×270 screenshot of the active display and sends it to a detector on your computer. The detector asks a Claude Code vision bridge whether the frame shows a commercial. On a confirmed ad, the TV helper mutes the speakers, lowers the active backlight, and displays an opaque “Commercial Break” card. Playback continues underneath. It restores sound and brightness when program content returns.
 
+For YouTube TV, the detector first checks the app's fixed upper-left **Sponsored** pill locally. A strong match mutes on that frame without waiting for Claude; frames without the pill follow the normal vision path. This template is specific to 480×270 captures from the tested YouTube TV app. In 1,589 saved frames from the owner's TV, it matched 68: 66 classified ads and two frames initially classified as program that visibly showed the pill over a political ad. Badge detection cannot shorten the wait until the TV takes its next screenshot.
+
 This repository shares **source and reproduction steps**, not an installable Samsung app. The tested path needs temporary root access. The TV-side components are staged manually and disappear or stop after a reboot. Nothing here disables Samsung tracking.
 
 ## What was tested
@@ -125,7 +127,7 @@ The default `tv.env.example` limits the first TV run to 15 minutes. If the agent
 
 ## Decision and fail-safe behavior
 
-The detector tracks recent program and ad observations in memory. One high-confidence ad frame immediately after a known program frame can mute; otherwise it waits for two distinct ad frames. It requires two confident program frames before unmuting. Break timing can increase screenshot frequency but never orders a mute on its own. The configured app ID and optional channel/title are hints; this project does not reliably discover YouTube TV's current channel or program title.
+The detector tracks recent program and ad observations in memory. A matched YouTube TV Sponsored pill mutes on one frame. Without the pill, one high-confidence ad frame immediately after a known program frame can mute; otherwise it waits for two distinct ad frames. It requires two confident program frames before unmuting. Break timing can increase screenshot frequency but never orders a mute on its own. The configured app ID and optional channel/title are hints; this project does not reliably discover YouTube TV's current channel or program title.
 
 If capture, the network, Docker, or the model fails, the helper releases the mute and active backlight change **that it owns**. The card has a renewable lease and disappears if the helper stops renewing it. A watchdog retries restoration after an unexpected helper stop. The viewer can always use the remote. The helper never pauses playback or changes channels. Test all of these behaviors before extended use on another TV.
 

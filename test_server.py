@@ -48,6 +48,24 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.process("tv", b"ad1", self.context)[0], "UNMUTE")
         self.assertEqual(d.process("tv", b"ad2", self.context)[0], "MUTE")
 
+    def test_youtube_tv_sponsored_badge_mutes_first_frame_without_model(self):
+        class UnavailableVision:
+            def classify(self, png, context):
+                raise AssertionError("badge should bypass vision")
+
+        d = Detector(UnavailableVision(), lambda: self.now)
+        with patch("sponsored_badge.present", return_value=True):
+            action, verdict = d.process("tv", b"badge", self.context)
+        self.assertEqual(action, "MUTE")
+        self.assertEqual(verdict.evidence, "YouTube TV Sponsored badge")
+
+    def test_badge_fast_path_is_restricted_to_youtube_tv(self):
+        d = self.detector(Verdict("program", .95, "show"))
+        with patch("sponsored_badge.present", return_value=True) as badge:
+            action, _ = d.process("tv", b"frame", dict(self.context, app="other.app"))
+        self.assertEqual(action, "UNMUTE")
+        badge.assert_not_called()
+
     def test_lower_confidence_ad_still_needs_confirmation(self):
         d = self.detector(Verdict("program", .97, "football"),
                           Verdict("ad", .89), Verdict("ad", .88))

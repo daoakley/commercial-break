@@ -12,6 +12,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import sponsored_badge
+
 MAX_FRAME_BYTES = 1_000_000
 MIN_CONFIDENCE = 0.70
 SINGLE_FRAME_AD_CONFIDENCE = 0.90
@@ -165,12 +167,19 @@ class Detector:
                                  program_first_observed_at_utc=(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(state.first_program_seen_at)) if state.first_program_seen_at else None),
                                  confirmed_ad_breaks_utc=[time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(value)) for value in state.ad_starts],
                                  recent_observations=state.recent_observations[-6:])
-            try:
-                verdict = self.vision.classify(png, model_context)
+            # This fixed YouTube TV UI badge is stronger evidence than a scene
+            # change and can be checked locally before the slower vision agent.
+            badge_hit = app == "com.samsung.tv.cobalt-yttv" and sponsored_badge.present(png)
+            if badge_hit:
+                verdict = Verdict("ad", 0.99, evidence="YouTube TV Sponsored badge")
                 state.model_unavailable = False
-            except Exception as exc:
-                verdict = Verdict("uncertain", evidence="model error: " + type(exc).__name__)
-                state.model_unavailable = True
+            else:
+                try:
+                    verdict = self.vision.classify(png, model_context)
+                    state.model_unavailable = False
+                except Exception as exc:
+                    verdict = Verdict("uncertain", evidence="model error: " + type(exc).__name__)
+                    state.model_unavailable = True
             state.updated_at = now
             previous_label = state.last_verdict
             state.last_verdict = verdict.label
@@ -223,7 +232,7 @@ class Detector:
                 and bool(state.program)
                 and previous_label == "program"
             )
-            if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program):
+            if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program or badge_hit):
                 state.muted_by_detector = True
                 if not state.ad_starts or state.ad_candidate_at - state.ad_starts[-1] > 30:
                     state.ad_starts.append(state.ad_candidate_at)
