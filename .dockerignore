@@ -1,0 +1,14 @@
+.git
+.env
+tv.env
+private/
+captures/
+samples/
+*.png
+*.wav
+*.pcm
+*.so
+*.dll
+**/bin/
+**/obj/
+__pycache__/
