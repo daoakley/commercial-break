@@ -19,6 +19,13 @@ MAX_FRAMES=${MAX_FRAMES:-0}
 MAX_RUNTIME_SECONDS=${MAX_RUNTIME_SECONDS:-0}
 MAX_MUTE_EXTENSION_SECONDS=${MAX_MUTE_EXTENSION_SECONDS:-300}
 PANEL_MASK_ON_CAPTURE=${PANEL_MASK_ON_CAPTURE:-0}
+CAPTURE_PERSISTENT=${CAPTURE_PERSISTENT:-0}
+FAST_MODE=${FAST_MODE:-0}
+NAVIGATION_OBSERVER=${NAVIGATION_OBSERVER:-0}
+NAVIGATION_DLL=${NAVIGATION_DLL:-/home/owner/share/tmp/sdk_tools/NavigationObserver.dll}
+NAVIGATION_PID=
+NAVIGATION_FILE="$STATE_DIR/navigation"
+TV_SESSION=${TV_SESSION:-$(date +%s)-$$}
 STARTED_AT=$(date +%s)
 
 mkdir -p "$STATE_DIR" || exit 1
@@ -32,6 +39,15 @@ WATCHDOG_PID=
 AGENT_DIR=${AGENT_DIR:-$(dirname "$0")}
 . "$AGENT_DIR/tv-backlight.sh"
 . "$AGENT_DIR/tv-overlay.sh"
+if [ "$CAPTURE_PERSISTENT" = 1 ]; then . "$AGENT_DIR/tv-capture.sh"; fi
+
+uptime_now() { awk '{print $1}' /proc/uptime; }
+navigation_generation() {
+  value=0
+  if [ -f "$NAVIGATION_FILE" ]; then read -r value < "$NAVIGATION_FILE" || true; fi
+  case "$value" in ''|*[!0-9]*) value=0 ;; esac
+  printf '%s\n' "$value"
+}
 
 get_mute() {
   /usr/bin/busctl --system --timeout=2 call org.tizen.speakermanager \
@@ -62,8 +78,10 @@ release_owned_mute() {
 }
 
 cleanup() {
+  if [ -n "$NAVIGATION_PID" ]; then kill "$NAVIGATION_PID" 2>/dev/null || true; fi
   rm -f "$STATE_DIR/panel-mask-enabled"
-  overlay_release
+  if [ "$CAPTURE_PERSISTENT" = 1 ]; then capture_worker_stop; fi
+  overlay_shutdown
   release_owned_mute
   release_owned_backlight || true
   rm -f "$CAPTURE_FILE" "$HEARTBEAT" "$OVERRIDE" "$RESPONSE_HEADERS"
@@ -87,6 +105,12 @@ else
 fi
 /bin/sh -c "$(cat "$AGENT_DIR/tv-watchdog.sh")" -- "$STATE_DIR" "$AGENT_DIR" &
 WATCHDOG_PID=$!
+date +%s > "$HEARTBEAT"
+if [ "$NAVIGATION_OBSERVER" = 1 ] && [ -f "$NAVIGATION_DLL" ]; then
+  /usr/bin/dotnet "$NAVIGATION_DLL" > "$STATE_DIR/navigation.log" 2>&1 &
+  NAVIGATION_PID=$!
+fi
+if [ "${OVERLAY_WARM:-0}" = 1 ]; then overlay_prepare || true; fi
 
 count=0
 while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
@@ -104,16 +128,27 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
     fi
   fi
   date +%s > "$HEARTBEAT"
+  cycle_started=$(uptime_now)
+  captured_navigation=$(navigation_generation)
   capture_pause=
   capture_ack=
-  if overlay_running; then
+  if [ -f "$OVERLAY_LEASE" ] && overlay_running; then
     capture_pause=$OVERLAY_PAUSE
     capture_ack=$OVERLAY_PAUSED_ACK
   fi
-  capture_output=$(CAPTURE_OVERLAY_PAUSE_FILE="$capture_pause" \
+  if [ "$CAPTURE_PERSISTENT" = 1 ]; then
+    if [ -z "$CAPTURE_PID" ] || ! kill -0 "$CAPTURE_PID" 2>/dev/null; then
+      capture_worker_start || { overlay_release; release_owned_mute; release_owned_backlight || true; sleep 3; continue; }
+    fi
+    mode=clear
+    if [ -n "$capture_pause" ]; then mode=covered; fi
+    capture_output=$(capture_worker_frame "$mode") || capture_output=
+  else
+    capture_output=$(CAPTURE_OVERLAY_PAUSE_FILE="$capture_pause" \
     CAPTURE_OVERLAY_ACK_FILE="$capture_ack" \
     LD_PRELOAD="/lib/libcapi-system-info.so.0:$PATCHED_LIB" \
     /usr/bin/dotnet "$PROBE_DLL" 2>&1) || capture_output=
+  fi
   case "$capture_output" in
     *'rc=0 width='*) ;;
     *) echo "capture unavailable" >&2; overlay_release; release_owned_mute; release_owned_backlight || true; sleep "$INTERVAL_SECONDS"; continue ;;
@@ -128,26 +163,40 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   fi
 
   request_ok=1
+  captured_at=$(uptime_now)
+  request_timeout=38
+  if [ "$FAST_MODE" = 1 ]; then request_timeout=3; fi
   observed_app=$(current_app_id)
   if [ -z "$observed_app" ]; then observed_app=$TV_APP; fi
-  action=$(curl -fsS --connect-timeout 2 --max-time 38 -D "$RESPONSE_HEADERS" -X POST \
+  action=$(curl -fsS --connect-timeout 2 --max-time "$request_timeout" -D "$RESPONSE_HEADERS" -X POST \
+    -H "Expect:" \
     -H "Authorization: Bearer $FRAME_TOKEN" \
     -H "Content-Type: image/png" \
     -H "X-TV-ID: $TV_ID" \
+    -H "X-TV-Session: $TV_SESSION-$captured_navigation" \
     -H "X-TV-App: $observed_app" \
     -H "X-TV-Channel: $TV_CHANNEL" \
     -H "X-TV-Title: $TV_TITLE" \
     -H "X-TV-Local-Time: $(date '+%Y-%m-%dT%H:%M:%S%z')" \
     --data-binary "@$CAPTURE_FILE" "$FRAME_URL") || { action=UNMUTE; request_ok=0; }
   rm -f "$CAPTURE_FILE"
+  response_at=$(uptime_now)
   next_interval=$INTERVAL_SECONDS
   if [ "$request_ok" -eq 1 ] && [ -f "$RESPONSE_HEADERS" ]; then
     suggested=$(awk 'tolower($1)=="x-next-capture-seconds:" {gsub("\r", "", $2); print $2}' "$RESPONSE_HEADERS" | tail -1)
-    case "$suggested" in 2|3|5|8|15) next_interval=$suggested ;; esac
+    case "$suggested" in 1|2|3|4|5|8|15) next_interval=$suggested ;; esac
   fi
   rm -f "$RESPONSE_HEADERS"
 
   observed_action=
+  current_navigation=$(navigation_generation)
+  # A remote action invalidates even a conclusive answer to an older frame.
+  # Leave a short grace period for the app's guide/channel transition.
+  if [ "$current_navigation" != "$captured_navigation" ] ||
+     { [ "$current_navigation" -gt 0 ] && [ $(( $(date +%s) - current_navigation / 1000 )) -lt 3 ]; }; then
+    action=UNMUTE
+    next_interval=1
+  fi
   if [ "${OBSERVE_ONLY:-0}" = 1 ]; then
     observed_action=$action
     action=UNMUTE
@@ -163,15 +212,16 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
           'ii 0 0') if set_mute true; then touch "$OWNED"; fi ;;
         esac
       fi
-      if [ -f "$OWNED" ] && [ -n "${AD_BACKLIGHT:-}" ]; then
-        dim_for_ad "$AD_BACKLIGHT" || echo "backlight dim unavailable" >&2
-      else
-        release_owned_backlight || true
-      fi
+      # Show a warmed card before slower brightness readbacks.
       if [ -f "$OWNED" ]; then
         overlay_start_or_renew || echo "commercial overlay unavailable" >&2
       else
         overlay_release
+      fi
+      if [ -f "$OWNED" ] && [ -n "${AD_BACKLIGHT:-}" ]; then
+        dim_for_ad "$AD_BACKLIGHT" || echo "backlight dim unavailable" >&2
+      else
+        release_owned_backlight || true
       fi
       ;;
     UNMUTE)
@@ -188,13 +238,21 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
       release_owned_backlight || true
       ;;
   esac
-  echo "$(date '+%H:%M:%S') decision=$action${observed_action:+ observed=$observed_action}"
+  cycle_finished=$(uptime_now)
+  timings=$(awk -v a="$cycle_started" -v b="$captured_at" -v c="$response_at" -v d="$cycle_finished" 'BEGIN {printf "capture_ms=%.0f request_ms=%.0f actuation_ms=%.0f", (b-a)*1000,(c-b)*1000,(d-c)*1000}')
+  echo "$(date '+%H:%M:%S') decision=$action${observed_action:+ observed=$observed_action} $timings"
   count=$((count + 1))
   date +%s > "$HEARTBEAT"
   if [ "$request_ok" -eq 0 ]; then
     # Keep playback untouched and reduce capture work while the computer is off.
     sleep 15
   else
-    sleep "$next_interval"
+    if [ "$FAST_MODE" = 1 ]; then
+      delay=$(awk -v a="$cycle_started" -v b="$cycle_finished" -v n="$next_interval" 'BEGIN {d=n-(b-a); printf "%.3f", (d>0.1?d:0.1)}') || delay=1
+      if [ -z "$delay" ]; then delay=1; fi
+      sleep "$delay"
+    else
+      sleep "$next_interval"
+    fi
   fi
 done

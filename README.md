@@ -6,7 +6,7 @@ For YouTube TV, the detector first checks the app's fixed upper-left **Sponsored
 
 This repository shares **source and reproduction steps**, not an installable Samsung app. The tested path needs temporary root access. The TV-side components are staged manually and disappear or stop after a reboot. Nothing here disables Samsung tracking.
 
-For the current state, validated limits, and prioritized follow-up work, see [the Astra handoff](docs/ASTRA_HANDOFF.md) and the [issue tracker](https://github.com/daoakley/commercial-break/issues).
+For the asynchronous fast path, context model, navigation reset and measured limits, see [Detection design](docs/DETECTION_DESIGN.md). The sequential endpoint remains the default for first-time setup. Also see [the Astra handoff](docs/ASTRA_HANDOFF.md) and the [issue tracker](https://github.com/daoakley/commercial-break/issues).
 
 ## What was tested
 
@@ -57,6 +57,7 @@ The health response confirms only that the detector is reachable. It does not pr
 ```sh
 dotnet build tv-probe/DisplayCaptureProbe.csproj -c Release
 dotnet build tv-overlay/CommercialOverlayProbe.csproj -c Release
+dotnet build tv-navigation/NavigationObserver.csproj -c Release
 ```
 
 The TV helper uses the .NET DLL and runtimeconfig files from each project's `bin/Release/netcoreapp3.1/` directory. Compiled DLLs are deliberately excluded from this repository. The TV must have a compatible .NET runtime.
@@ -90,14 +91,16 @@ The patch succeeds only if the original library matches the tested `T-PTMAKUC-17
 
 ## 4. Stage and start the TV helper
 
-Push the four shell files, built .NET files, card scene, private TV settings, and temporary library. The staging path below is the one verified on the tested Frame:
+Push the shell files, built .NET files, card scene, private TV settings, and temporary library. The staging path below is the one verified on the tested Frame:
 
 ```sh
-for name in tv-agent.sh tv-watchdog.sh tv-backlight.sh tv-overlay.sh; do
+for name in tv-agent.sh tv-watchdog.sh tv-backlight.sh tv-overlay.sh tv-capture.sh; do
   "$SDB" push "$name" "$STAGE/$name"
 done
 "$SDB" push tv-probe/bin/Release/netcoreapp3.1/DisplayCaptureProbe.dll "$STAGE/DisplayCaptureProbe.dll"
 "$SDB" push tv-probe/bin/Release/netcoreapp3.1/DisplayCaptureProbe.runtimeconfig.json "$STAGE/DisplayCaptureProbe.runtimeconfig.json"
+"$SDB" push tv-navigation/bin/Release/netcoreapp3.1/NavigationObserver.dll "$STAGE/NavigationObserver.dll"
+"$SDB" push tv-navigation/bin/Release/netcoreapp3.1/NavigationObserver.runtimeconfig.json "$STAGE/NavigationObserver.runtimeconfig.json"
 "$SDB" push tv-overlay/bin/Release/netcoreapp3.1/CommercialOverlayProbe.dll "$STAGE/CommercialOverlayProbe.dll"
 "$SDB" push tv-overlay/bin/Release/netcoreapp3.1/CommercialOverlayProbe.runtimeconfig.json "$STAGE/CommercialOverlayProbe.runtimeconfig.json"
 "$SDB" push tv-overlay/commercial-break-scene.json "$STAGE/commercial-break-scene.json"

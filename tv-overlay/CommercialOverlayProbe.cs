@@ -43,6 +43,8 @@ internal static class CommercialOverlayProbe
     private static string leaseFile;
     private static string pauseFile;
     private static string pausedAckFile;
+    private static string standbyFile;
+    private static string navigationFile;
     private static bool isPaused;
 
     [DllImport("libc.so.6", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
@@ -239,6 +241,14 @@ internal static class CommercialOverlayProbe
             {
                 pausedAckFile = arguments[++index];
             }
+            else if (arguments[index] == "--standby-file" && index + 1 < arguments.Length)
+            {
+                standbyFile = arguments[++index];
+            }
+            else if (arguments[index] == "--navigation-file" && index + 1 < arguments.Length)
+            {
+                navigationFile = arguments[++index];
+            }
             else
             {
                 PrintUsage();
@@ -262,7 +272,9 @@ internal static class CommercialOverlayProbe
             Console.Error.WriteLine("control files must be provided together");
             return 2;
         }
-        if (leaseFile != null && !File.Exists(leaseFile))
+        if (leaseFile != null && !File.Exists(leaseFile) &&
+            (standbyFile == null || !File.Exists(standbyFile) ||
+             DateTime.UtcNow - File.GetLastWriteTimeUtc(standbyFile) >= TimeSpan.FromSeconds(45)))
         {
             Console.Error.WriteLine("lease file is missing");
             return 2;
@@ -336,7 +348,8 @@ internal static class CommercialOverlayProbe
         }
 
         evas_object_pass_events_set(window, 1);
-        evas_object_show(window);
+        if (standbyFile == null && !NavigationRecent()) evas_object_show(window);
+        else { evas_object_hide(window); isPaused = true; }
         controlledWindow = window;
 
         Console.WriteLine(
@@ -386,16 +399,35 @@ internal static class CommercialOverlayProbe
         Console.Error.WriteLine(
             "usage: CommercialOverlayProbe [--seconds N] [--verbose-efl] "
             + "([--message text] | [--scene scene.json]) "
-            + "[--lease-file path --pause-file path --paused-ack-file path]");
+            + "[--lease-file path --pause-file path --paused-ack-file path] "
+            + "[--standby-file heartbeat --navigation-file path]");
     }
+
+    private static bool NavigationRecent() => navigationFile != null && File.Exists(navigationFile) &&
+        DateTime.UtcNow - File.GetLastWriteTimeUtc(navigationFile) < TimeSpan.FromSeconds(3);
 
     private static int CheckControl(IntPtr data)
     {
         try
         {
+            if (NavigationRecent())
+            {
+                evas_object_hide(controlledWindow);
+                isPaused = true;
+                if (File.Exists(leaseFile)) File.Delete(leaseFile);
+                return 1;
+            }
             if (!File.Exists(leaseFile) ||
                 DateTime.UtcNow - File.GetLastWriteTimeUtc(leaseFile) > TimeSpan.FromSeconds(50))
             {
+                if (standbyFile != null && File.Exists(standbyFile) &&
+                    DateTime.UtcNow - File.GetLastWriteTimeUtc(standbyFile) < TimeSpan.FromSeconds(45))
+                {
+                    evas_object_hide(controlledWindow);
+                    isPaused = true;
+                    if (pausedAckFile != null && File.Exists(pausedAckFile)) File.Delete(pausedAckFile);
+                    return 1;
+                }
                 quitReason = "lease_expired";
                 ecore_main_loop_quit();
                 return 0;
@@ -408,11 +440,11 @@ internal static class CommercialOverlayProbe
                 File.Delete(pauseFile);
                 shouldPause = false;
             }
-            if (shouldPause && !isPaused)
+            if (shouldPause)
             {
-                evas_object_hide(controlledWindow);
+                if (!isPaused) evas_object_hide(controlledWindow);
                 isPaused = true;
-                File.WriteAllText(pausedAckFile, "paused");
+                if (!File.Exists(pausedAckFile)) File.WriteAllText(pausedAckFile, "paused");
             }
             else if (!shouldPause && isPaused)
             {

@@ -6,6 +6,7 @@ services:
       FRAME_TOKEN: ${FRAME_TOKEN:?Set FRAME_TOKEN in .env}
       VISION_SERVICE_URL: ${VISION_SERVICE_URL:-}
       VISION_SERVICE_TOKEN: ${VISION_SERVICE_TOKEN:-}
+      ENABLE_REALTIME: ${ENABLE_REALTIME:-0}
     ports:
       - "${BIND_IP:-127.0.0.1}:${PORT:-28471}:8080"
     read_only: true

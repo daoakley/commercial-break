@@ -9,11 +9,8 @@ internal static class Program
     [DllImport("libdisplay-capture-api.so.0", EntryPoint = "dc_request_capture_to_file_sync", CallingConvention = CallingConvention.Cdecl)]
     private static extern int Capture(IntPtr request);
 
-    // The display service latches the frame before its synchronous PNG write
-    // finishes. Keep the card hidden through that latch, then restore it while
-    // encoding continues. A shorter 100 ms test captured the card; 200 ms
-    // captured video on this Frame, so leave a small margin.
-    private const int CaptureLatchMillis = 225;
+    // Keep the card hidden until the capture API actually returns. Guessing
+    // the latch time sometimes captured the cover instead of the broadcast.
     private const int CaptureCompletionTimeoutMillis = 5000;
     // Let the physical panel mute settle before uncovering the video.
     // The overlay's resume acknowledgement can also precede the next scanout.
@@ -106,7 +103,26 @@ internal static class Program
         return Process.Start(start);
     }
 
-    private static int Main()
+    private static int Main(string[] args)
+    {
+        if (args.Length == 1 && args[0] == "--serve")
+        {
+            Console.WriteLine("capture_ready");
+            Console.Out.Flush();
+            string command;
+            while ((command = Console.ReadLine()) != null && command != "quit")
+            {
+                if (command != "clear" && command != "covered") return 2;
+                int result = CaptureOnce(command == "covered");
+                Console.Out.Flush();
+                if (result != 0) return result;
+            }
+            return 0;
+        }
+        return args.Length == 0 ? CaptureOnce(null) : 2;
+    }
+
+    private static int CaptureOnce(bool? forceCovered)
     {
         string basename = Environment.GetEnvironmentVariable("CAPTURE_FILE_BASENAME") ?? "codex-display-sample.png";
         if (basename.Length == 0 || basename.IndexOfAny(new[] { '/', '\\' }) >= 0)
@@ -127,7 +143,7 @@ internal static class Program
             Marshal.WriteInt32(request, 0x1c, 270);
             string pauseFile = Environment.GetEnvironmentVariable("CAPTURE_OVERLAY_PAUSE_FILE");
             string ackFile = Environment.GetEnvironmentVariable("CAPTURE_OVERLAY_ACK_FILE");
-            bool cardActive = !string.IsNullOrEmpty(pauseFile) && !string.IsNullOrEmpty(ackFile);
+            bool cardActive = (forceCovered ?? true) && !string.IsNullOrEmpty(pauseFile) && !string.IsNullOrEmpty(ackFile);
             Stopwatch uncovered = new Stopwatch();
             Stopwatch captureClock = new Stopwatch();
             Stopwatch masked = new Stopwatch();
@@ -166,6 +182,8 @@ internal static class Program
                         Console.Error.WriteLine("overlay_pause_timeout");
                         return 1;
                     }
+                    // The hide acknowledgement precedes compositor scanout.
+                    Thread.Sleep(60);
                     int workerResult = -1;
                     Exception workerError = null;
                     Thread worker = new Thread(() =>
@@ -176,7 +194,11 @@ internal static class Program
                     worker.IsBackground = true;
                     captureClock.Start();
                     worker.Start();
-                    Thread.Sleep(CaptureLatchMillis);
+                    // The physical panel is already masked. Wait for the real
+                    // capture completion instead of guessing when it latched;
+                    // showing the card after 225 ms sometimes captured our card.
+                    if (!worker.Join(CaptureCompletionTimeoutMillis))
+                        Environment.Exit(1);
                     File.Delete(pauseFile);
                     for (int i = 0; File.Exists(ackFile) && i < 100; i++)
                         Thread.Sleep(10);
@@ -205,7 +227,18 @@ internal static class Program
                 else
                 {
                     captureClock.Start();
-                    rc = Capture(request);
+                    int result = -1;
+                    Exception error = null;
+                    Thread worker = new Thread(() =>
+                    {
+                        try { result = Capture(request); }
+                        catch (Exception caught) { error = caught; }
+                    });
+                    worker.IsBackground = true;
+                    worker.Start();
+                    if (!worker.Join(CaptureCompletionTimeoutMillis)) Environment.Exit(1);
+                    if (error != null) return 1;
+                    rc = result;
                 }
                 captureClock.Stop();
                 captureMillis = captureClock.ElapsedMilliseconds;

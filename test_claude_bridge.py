@@ -3,10 +3,23 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from claude_bridge import AuditStore, parse_verdict
+from claude_bridge import AuditStore, parse_verdict, build_prompt
+import json
 
 
 class VerdictParsingTests(unittest.TestCase):
+    def test_actual_policy_tail_and_large_context_reach_model_intact(self):
+        from server import SYSTEM_PROMPT
+        context = {"known_program": "show", "recent_observations": ["x" * 800] * 4}
+        prompt = build_prompt(context, SYSTEM_PROMPT)
+        self.assertIn(SYSTEM_PROMPT, prompt)
+        self.assertIn("always set program_changed false", prompt)
+        self.assertIn(json.dumps(context), prompt)
+
+    def test_oversized_context_fails_instead_of_silently_losing_rules(self):
+        with self.assertRaises(ValueError):
+            build_prompt({"unknown": "x" * 13000}, "classify safely")
+
     def test_accepts_claude_json_fence(self):
         result = parse_verdict('```json\n{"label":"ad","confidence":0.85,"program":"","evidence":"pitch"}\n```')
         self.assertEqual(result["label"], "ad")
@@ -15,6 +28,9 @@ class VerdictParsingTests(unittest.TestCase):
     def test_rejects_unusable_verdict(self):
         with self.assertRaises(ValueError):
             parse_verdict('{"label":"ad","confidence":3}')
+
+    def test_unknown_program_is_not_the_literal_name_none(self):
+        self.assertEqual(parse_verdict('{"label":"program","confidence":0.9,"program":null}')["program"], "")
 
     def test_program_change_signal_is_boolean(self):
         self.assertTrue(parse_verdict('{"label":"program","confidence":0.9,"program_changed":true}')["program_changed"])
