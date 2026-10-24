@@ -150,6 +150,17 @@ class DetectorTests(unittest.TestCase):
         self.now = 1250
         self.assertEqual(d.next_interval("tv"), 5)
 
+    def test_muted_break_checks_slowly_but_confirms_program_return_quickly(self):
+        d = self.detector(Verdict("ad", .95), Verdict("ad", .95),
+                          Verdict("program", .9, "football"),
+                          Verdict("program", .91, "football"))
+        d.process("tv", b"ad1", self.context)
+        d.process("tv", b"ad2", self.context)
+        self.assertEqual(d.next_interval("tv"), 8)
+        self.assertEqual(d.process("tv", b"show1", self.context)[0], "MUTE")
+        self.assertEqual(d.next_interval("tv"), 2)
+        self.assertEqual(d.process("tv", b"show2", self.context)[0], "UNMUTE")
+
     def test_next_frame_receives_recent_visual_context(self):
         seen = []
 

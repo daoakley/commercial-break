@@ -112,7 +112,11 @@ class Detector:
         with state.lock:
             if state.model_unavailable:
                 return 15
-            if state.muted_by_detector or state.ad_streak or state.program_streak == 1:
+            if state.muted_by_detector:
+                # Avoid repeatedly uncovering the ad behind the card. Once a
+                # program frame appears, confirm it promptly before unmuting.
+                return 2 if state.program_streak == 1 else 8
+            if state.ad_streak or state.program_streak == 1:
                 return 2
             if state.last_verdict == "uncertain":
                 return 3
