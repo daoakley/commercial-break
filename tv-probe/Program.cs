@@ -15,6 +15,83 @@ internal static class Program
     // captured video on this Frame, so leave a small margin.
     private const int CaptureLatchMillis = 225;
     private const int CaptureCompletionTimeoutMillis = 5000;
+    private const string OwnedBacklight = "/run/codex-commercial-muter/owned-backlight";
+    private const string PanelMaskEnabled = "/run/codex-commercial-muter/panel-mask-enabled";
+    private const string BacklightService = "org.tizen.tv.avoc";
+    private const string BacklightObject = "/org/tizen/tv/avoc";
+    private const string BacklightInterface = "org.tizen.tv.avoc.AvOutputControl";
+
+    private static string Busctl(params string[] arguments)
+    {
+        var start = new ProcessStartInfo("/usr/bin/busctl")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (string common in new[] { "--system", "--timeout=2", "call", BacklightService,
+                                           BacklightObject, BacklightInterface })
+            start.ArgumentList.Add(common);
+        foreach (string argument in arguments)
+            start.ArgumentList.Add(argument);
+        using (Process process = Process.Start(start))
+        {
+            if (process == null) return "";
+            if (!process.WaitForExit(2500))
+            {
+                process.Kill();
+                return "";
+            }
+            return process.ExitCode == 0 ? process.StandardOutput.ReadToEnd().Trim() : "";
+        }
+    }
+
+    private static int ActiveBacklight()
+    {
+        string[] fields = Busctl("GetBacklight", "i", "0").Split(' ',
+            StringSplitOptions.RemoveEmptyEntries);
+        return fields.Length == 3 && fields[0] == "ii" && fields[2] == "0"
+            && int.TryParse(fields[1], out int value) ? value : -1;
+    }
+
+    private static bool SetActiveBacklight(int value) =>
+        Busctl("SetBacklight", "ii", value.ToString(), "0") == "i 0";
+
+    private static int OwnedTargetBacklight()
+    {
+        string enabled = Environment.GetEnvironmentVariable("CAPTURE_PANEL_MASK_ENABLED_FILE")
+            ?? PanelMaskEnabled;
+        string owned = Environment.GetEnvironmentVariable("CAPTURE_PANEL_MASK_STATE_FILE")
+            ?? OwnedBacklight;
+        if (!File.Exists(enabled) || !File.Exists(owned)) return -1;
+        string[] fields = File.ReadAllText(owned).Split(
+            (char[])null, StringSplitOptions.RemoveEmptyEntries);
+        if (fields.Length != 3 || !int.TryParse(fields[1], out int target)
+            || target < 1 || target > 50 || ActiveBacklight() != target) return -1;
+        return target;
+    }
+
+    private static Process StartPanelRescue(int target)
+    {
+        // A separate process restores the panel if this capture process dies.
+        // It only writes when the active value is still zero.
+        string script = "sleep 2; current=$(/usr/bin/busctl --system --timeout=2 call "
+            + BacklightService + " " + BacklightObject + " " + BacklightInterface
+            + " GetBacklight i 0 2>/dev/null); "
+            + "if [ \"$current\" = 'ii 0 0' ]; then /usr/bin/busctl --system --timeout=2 call "
+            + BacklightService + " " + BacklightObject + " " + BacklightInterface
+            + " SetBacklight ii " + target + " 0 >/dev/null 2>&1; fi";
+        var start = new ProcessStartInfo("/bin/sh")
+        {
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add(script);
+        return Process.Start(start);
+    }
 
     private static int Main()
     {
@@ -40,12 +117,32 @@ internal static class Program
             bool cardActive = !string.IsNullOrEmpty(pauseFile) && !string.IsNullOrEmpty(ackFile);
             Stopwatch uncovered = new Stopwatch();
             Stopwatch captureClock = new Stopwatch();
+            Stopwatch masked = new Stopwatch();
             long captureMillis = 0;
             int rc;
+            int maskedTarget = -1;
+            Process rescue = null;
             try
             {
                 if (cardActive)
                 {
+                    maskedTarget = OwnedTargetBacklight();
+                    if (maskedTarget >= 0)
+                    {
+                        rescue = StartPanelRescue(maskedTarget);
+                        if (rescue != null)
+                        {
+                            SetActiveBacklight(0);
+                            if (ActiveBacklight() == 0)
+                            {
+                                masked.Start();
+                                // Let the panel change take effect before uncovering video.
+                                Thread.Sleep(50);
+                            }
+                            else maskedTarget = -1;
+                        }
+                        else maskedTarget = -1;
+                    }
                     File.Delete(ackFile);
                     uncovered.Start();
                     File.WriteAllText(pauseFile, "pause");
@@ -100,14 +197,30 @@ internal static class Program
             }
             finally
             {
+                // Restore the panel before touching overlay files: a file error
+                // must not leave the viewer looking at a dark screen.
+                if (rescue != null)
+                {
+                    int active = ActiveBacklight();
+                    if (active == 0)
+                    {
+                        if (SetActiveBacklight(maskedTarget)) active = ActiveBacklight();
+                    }
+                    // If the read or restore failed, leave the independent
+                    // timed rescue alive. Never cancel it on an unknown state.
+                    if (active > 0 && !rescue.HasExited)
+                        try { rescue.Kill(); } catch (InvalidOperationException) { }
+                }
+                if (masked.IsRunning) masked.Stop();
                 if (cardActive)
                 {
                     File.Delete(pauseFile);
                     if (uncovered.IsRunning) uncovered.Stop();
                 }
+                if (rescue != null) rescue.Dispose();
             }
             string path = Marshal.PtrToStringAnsi(IntPtr.Add(request, 0x28)) ?? "";
-            Console.WriteLine($"rc={rc} width={Marshal.ReadInt32(request, 0x20)} height={Marshal.ReadInt32(request, 0x24)} path={path} uncovered_ms={uncovered.ElapsedMilliseconds} capture_ms={captureMillis}");
+            Console.WriteLine($"rc={rc} width={Marshal.ReadInt32(request, 0x20)} height={Marshal.ReadInt32(request, 0x24)} path={path} uncovered_ms={uncovered.ElapsedMilliseconds} capture_ms={captureMillis} panel_mask_ms={masked.ElapsedMilliseconds}");
             return rc == 0 ? 0 : 1;
         }
         finally

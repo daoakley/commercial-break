@@ -18,6 +18,7 @@ TV_TITLE=${TV_TITLE:-}
 MAX_FRAMES=${MAX_FRAMES:-0}
 MAX_RUNTIME_SECONDS=${MAX_RUNTIME_SECONDS:-0}
 MAX_MUTE_EXTENSION_SECONDS=${MAX_MUTE_EXTENSION_SECONDS:-300}
+PANEL_MASK_ON_CAPTURE=${PANEL_MASK_ON_CAPTURE:-0}
 STARTED_AT=$(date +%s)
 
 mkdir -p "$STATE_DIR" || exit 1
@@ -38,7 +39,9 @@ get_mute() {
 }
 
 current_app_id() {
-  # Tizen's foreground-app key lets app-specific rules follow app switches.
+  # Read Tizen's foreground-app key for each frame. The configured ID is only
+  # a fallback if this key is unavailable; app switches otherwise reset the
+  # detector's context instead of masquerading as YouTube TV.
   /usr/bin/vconftool get memory/appfw/current_fullscreen_appid 2>/dev/null |
     sed -n 's/^[^,]*, value = \([A-Za-z0-9._-]*\) (String)$/\1/p' |
     head -n 1
@@ -59,6 +62,7 @@ release_owned_mute() {
 }
 
 cleanup() {
+  rm -f "$STATE_DIR/panel-mask-enabled"
   overlay_release
   release_owned_mute
   release_owned_backlight || true
@@ -76,6 +80,11 @@ if [ ! -f "$PROBE_DLL" ] || [ ! -f "$PATCHED_LIB" ]; then
 fi
 
 release_owned_backlight || true
+if [ "$PANEL_MASK_ON_CAPTURE" = 1 ]; then
+  touch "$STATE_DIR/panel-mask-enabled"
+else
+  rm -f "$STATE_DIR/panel-mask-enabled"
+fi
 /bin/sh -c "$(cat "$AGENT_DIR/tv-watchdog.sh")" -- "$STATE_DIR" "$AGENT_DIR" &
 WATCHDOG_PID=$!
 
