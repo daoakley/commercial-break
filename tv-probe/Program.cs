@@ -15,6 +15,10 @@ internal static class Program
     // captured video on this Frame, so leave a small margin.
     private const int CaptureLatchMillis = 225;
     private const int CaptureCompletionTimeoutMillis = 5000;
+    // Let the physical panel mute settle before uncovering the video.
+    // The overlay's resume acknowledgement can also precede the next scanout.
+    private const int PanelDarkLeadMillis = 350;
+    private const int PanelCardReturnMillis = 200;
     private const string OwnedBacklight = "/run/codex-commercial-muter/owned-backlight";
     private const string PanelMaskEnabled = "/run/codex-commercial-muter/panel-mask-enabled";
     private const string BacklightService = "org.tizen.tv.avoc";
@@ -54,8 +58,17 @@ internal static class Program
             && int.TryParse(fields[1], out int value) ? value : -1;
     }
 
-    private static bool SetActiveBacklight(int value) =>
-        Busctl("SetBacklight", "ii", value.ToString(), "0") == "i 0";
+    private static int LfdPanelMute()
+    {
+        string[] fields = Busctl("GetLfdPanelMute").Split(' ',
+            StringSplitOptions.RemoveEmptyEntries);
+        return fields.Length == 3 && fields[0] == "ii" && fields[2] == "0"
+            && int.TryParse(fields[1], out int value) && (value == 0 || value == 1)
+            ? value : -1;
+    }
+
+    private static bool SetLfdPanelMute(int value) =>
+        Busctl("SetLfdPanelMute", "i", value.ToString()) == "i 0";
 
     private static int OwnedTargetBacklight()
     {
@@ -71,16 +84,16 @@ internal static class Program
         return target;
     }
 
-    private static Process StartPanelRescue(int target)
+    private static Process StartPanelRescue()
     {
-        // A separate process restores the panel if this capture process dies.
-        // It only writes when the active value is still zero.
-        string script = "sleep 2; current=$(/usr/bin/busctl --system --timeout=2 call "
+        // A separate process unmutes the physical panel if capture dies.
+        // It only writes when this panel control still reports mute on.
+        string script = "sleep 4; current=$(/usr/bin/busctl --system --timeout=2 call "
             + BacklightService + " " + BacklightObject + " " + BacklightInterface
-            + " GetBacklight i 0 2>/dev/null); "
-            + "if [ \"$current\" = 'ii 0 0' ]; then /usr/bin/busctl --system --timeout=2 call "
+            + " GetLfdPanelMute 2>/dev/null); "
+            + "if [ \"$current\" = 'ii 1 0' ]; then /usr/bin/busctl --system --timeout=2 call "
             + BacklightService + " " + BacklightObject + " " + BacklightInterface
-            + " SetBacklight ii " + target + " 0 >/dev/null 2>&1; fi";
+            + " SetLfdPanelMute i 0 >/dev/null 2>&1; fi";
         var start = new ProcessStartInfo("/bin/sh")
         {
             UseShellExecute = false,
@@ -127,17 +140,17 @@ internal static class Program
                 if (cardActive)
                 {
                     maskedTarget = OwnedTargetBacklight();
-                    if (maskedTarget >= 0)
+                    if (maskedTarget >= 0 && LfdPanelMute() == 0)
                     {
-                        rescue = StartPanelRescue(maskedTarget);
+                        rescue = StartPanelRescue();
                         if (rescue != null)
                         {
-                            SetActiveBacklight(0);
-                            if (ActiveBacklight() == 0)
+                            SetLfdPanelMute(1);
+                            if (LfdPanelMute() == 1)
                             {
                                 masked.Start();
-                                // Let the panel change take effect before uncovering video.
-                                Thread.Sleep(50);
+                                // Readback can precede the physical panel change.
+                                Thread.Sleep(PanelDarkLeadMillis);
                             }
                             else maskedTarget = -1;
                         }
@@ -175,6 +188,8 @@ internal static class Program
                             Environment.Exit(1);
                         return 1;
                     }
+                    if (masked.IsRunning)
+                        Thread.Sleep(PanelCardReturnMillis);
                     if (!worker.Join(CaptureCompletionTimeoutMillis))
                     {
                         Console.Error.WriteLine("capture_timeout");
@@ -198,17 +213,17 @@ internal static class Program
             finally
             {
                 // Restore the panel before touching overlay files: a file error
-                // must not leave the viewer looking at a dark screen.
+                // must not leave the viewer looking at a black screen.
                 if (rescue != null)
                 {
-                    int active = ActiveBacklight();
-                    if (active == 0)
+                    int panel = LfdPanelMute();
+                    if (panel == 1)
                     {
-                        if (SetActiveBacklight(maskedTarget)) active = ActiveBacklight();
+                        if (SetLfdPanelMute(0)) panel = LfdPanelMute();
                     }
                     // If the read or restore failed, leave the independent
                     // timed rescue alive. Never cancel it on an unknown state.
-                    if (active > 0 && !rescue.HasExited)
+                    if (panel == 0 && !rescue.HasExited)
                         try { rescue.Kill(); } catch (InvalidOperationException) { }
                 }
                 if (masked.IsRunning) masked.Stop();
