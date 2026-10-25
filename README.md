@@ -1,3 +1,5 @@
+> **Current project status and Claude handoff:** read [HANDOFF.md](HANDOFF.md). Newer source and comprehensive documentation are in draft PR #5; the 20+ second detection delay and suspended fast-display experiment remain unresolved.
+
 # Commercial Break
 
 Commercial Break is an experimental commercial muter for a Samsung Frame TV. A temporary TV-side helper captures a 480×270 screenshot of the active display and sends it to a detector on your computer. The detector asks a Claude Code vision bridge whether the frame shows a commercial. On a confirmed ad, the TV helper mutes the speakers, lowers the active backlight, and displays an opaque “Commercial Break” card. Playback continues underneath. It restores sound and brightness when program content returns.
