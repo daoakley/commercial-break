@@ -1,0 +1,36 @@
+#!/bin/sh
+# Optional, temporary on-TV commercial card. The overlay process expires when
+# its lease stops refreshing and never changes the underlying playback app.
+OVERLAY_LEASE="$STATE_DIR/overlay-lease"
+OVERLAY_PAUSE="$STATE_DIR/overlay-pause"
+OVERLAY_PAUSED_ACK="$STATE_DIR/overlay-paused-ack"
+OVERLAY_PID="$STATE_DIR/overlay-pid"
+OVERLAY_DLL=${OVERLAY_DLL:-/home/owner/share/tmp/sdk_tools/CommercialOverlayProbe.dll}
+OVERLAY_SCENE=${OVERLAY_SCENE:-/home/owner/share/tmp/sdk_tools/commercial-break-scene.json}
+
+overlay_release() {
+  rm -f "$OVERLAY_LEASE" "$OVERLAY_PAUSE" "$OVERLAY_PAUSED_ACK" "$OVERLAY_PID"
+}
+
+overlay_running() {
+  [ -f "$OVERLAY_PID" ] || return 1
+  read -r pid < "$OVERLAY_PID" || return 1
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  kill -0 "$pid" 2>/dev/null || return 1
+  case "$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" in
+    *CommercialOverlayProbe.dll*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+overlay_start_or_renew() {
+  [ "${AD_OVERLAY:-0}" = 1 ] || return 0
+  [ -f "$OVERLAY_DLL" ] && [ -f "$OVERLAY_SCENE" ] || return 1
+  touch "$OVERLAY_LEASE" || return 1
+  if overlay_running; then return 0; fi
+  rm -f "$OVERLAY_PAUSE" "$OVERLAY_PAUSED_ACK"
+  /usr/bin/dotnet "$OVERLAY_DLL" --seconds 0 --scene "$OVERLAY_SCENE" \
+    --lease-file "$OVERLAY_LEASE" --pause-file "$OVERLAY_PAUSE" \
+    --paused-ack-file "$OVERLAY_PAUSED_ACK" > "$STATE_DIR/overlay.log" 2>&1 &
+  echo "$!" > "$OVERLAY_PID"
+}
