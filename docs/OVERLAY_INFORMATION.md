@@ -24,7 +24,9 @@ seconds. There is no animation or fabricated trivia.
   durable viewing history and is lost when the detector restarts. First-observed
   time is not the scheduled program start.
 - Native YouTube ad progress, ad counts and confirmed show metadata are not yet
-  wired into this card. The pairing/event experiment remains observation-only.
+  wired into this card. The pairing/event experiment remains observation-only. A live break test
+  received six native ad events, but visible broadcast ads continued after the
+  native segment ended; its duration is not a safe full-break countdown.
 
 ## How it works and fails safely
 

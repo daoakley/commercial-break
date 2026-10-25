@@ -25,13 +25,21 @@ This does **not** disable Samsung ACR or other tracking. Frames and viewing cont
 
 ## Latest change and evidence
 
-A bounded paired-client experiment subsequently connected to the running
-YouTube TV app through its advertised DIAL application status and YouTube
-Lounge. It received live now-playing/content identity, playback position,
-duration, seekable bounds and audio-track events. No ad-state event was
-observed during that 90-second window. This is a promising continuous source;
-it is not yet connected to production context or mute, and it does not prove
-a native ad boundary. The observer disconnected after the bounded test.
+A paired-client experiment connected to the running YouTube TV app through
+its advertised DIAL application status and YouTube Lounge. It received live
+now-playing identity, playback position and duration. A subsequent five-minute
+break test received six `adPlaying` events with distinct IDs, each accompanied
+by playback `state=1081`. Their decreasing durations predicted one shared
+inserted-segment endpoint within a 0.30-second spread. Their `adState` was -1,
+so a naïve `adState==1` rule would miss them.
+
+Saved TV footage showed broadcast commercials both before those events and
+after the native segment ended. Native events are therefore a candidate
+supplementary onset source, not complete break coverage or a safe release
+signal. Keep visual fallback and program-return confirmation. Channel/seek
+binding, stale events and held-out false alarms remain unvalidated. This feed
+still has no production mute authority; private evidence and credentials are
+not included in the repository.
 
 
 Astra’s audit found that the bridge truncated instructions at 1,600 characters, so earlier offline prompt successes did not establish that all safeguards reached the live model. Complete instructions and JSON context now pass through, with explicit size rejection. Local own-card filtering prevents a contaminated screenshot from renewing ad evidence; seven saved card frames were inspected, six formerly labeled as ads.
