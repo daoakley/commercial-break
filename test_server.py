@@ -189,25 +189,25 @@ class DetectorTests(unittest.TestCase):
         d.process("tv", b"ad2", self.context)
         self.assertEqual(d.state("tv").ad_starts, [1100])
 
-    def test_stable_cadence_increases_sampling_near_next_break(self):
+    def test_cadence_never_slows_the_short_program_idle_gap(self):
         d = self.detector()
         s = d.state("tv")
         s.last_verdict = "program"
         s.ad_starts = [100, 400, 700]
         self.now = 800
-        self.assertEqual(d.next_interval("tv"), 5)
+        self.assertEqual(d.next_interval("tv"), 1)
         self.now = 950
-        self.assertEqual(d.next_interval("tv"), 3)
+        self.assertEqual(d.next_interval("tv"), 1)
         s.ad_starts = [100, 400, 1000]
         self.now = 1250
-        self.assertEqual(d.next_interval("tv"), 5)
+        self.assertEqual(d.next_interval("tv"), 1)
 
     def test_uncertain_frame_requests_faster_followup_without_muting(self):
         d = self.detector(Verdict("program", .95, "football"),
                           Verdict("uncertain", .55))
         d.process("tv", b"show", self.context)
         self.assertEqual(d.process("tv", b"cutaway", self.context)[0], "UNMUTE")
-        self.assertEqual(d.next_interval("tv"), 2)
+        self.assertEqual(d.next_interval("tv"), 1)
 
     def test_muted_break_checks_slowly_but_confirms_program_return_quickly(self):
         d = self.detector(Verdict("ad", .95), Verdict("ad", .95),
@@ -248,6 +248,16 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.process("tv", b"game3", self.context)[0], "UNMUTE")
         self.assertEqual(d.state("tv").program, "basketball")
         self.assertEqual(d.state("tv").ad_starts, [])
+
+    def test_acr_capture_backend_keeps_covered_checks_frequent(self):
+        d = self.detector(Verdict("ad", .95), Verdict("ad", .95))
+        d.process("tv", b"ad1", self.context)
+        self.assertEqual(d.process("tv", b"ad2", self.context)[0], "MUTE")
+        self.assertEqual(d.next_interval("tv"), 8)
+        self.assertEqual(d.next_interval("tv", "acr"), 4)
+        self.assertEqual(d.next_interval("tv", "display"), 8)
+        d.state("tv").program_streak = 1
+        self.assertEqual(d.next_interval("tv", "acr"), 2)
 
 
 class VisionServiceRequestTests(unittest.TestCase):

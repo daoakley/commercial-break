@@ -34,6 +34,14 @@ internal static class CommercialOverlayProbe
 
     private static readonly EcoreTaskCallback QuitCallback = QuitMainLoop;
     private static readonly EcoreTaskCallback ControlCallback = CheckControl;
+    private static readonly EcoreTaskCallback InfoCallback = RefreshInfo;
+    private static SceneRenderer infoRenderer;
+    private static string infoFile;
+    private static string historyFile;
+    private static BreakTracker breakTracker;
+    // Persistent storage: survives TV standby and Mac-side restarts, unlike /run.
+    private const string DefaultHistoryPath =
+        "/home/owner/share/tmp/sdk_tools/commercial-break-history.json";
     private static readonly EcoreThreadSafeCallback ThreadSafeQuitCallback =
         QuitMainLoopFromSignal;
     private static int quitRequested;
@@ -43,6 +51,8 @@ internal static class CommercialOverlayProbe
     private static string leaseFile;
     private static string pauseFile;
     private static string pausedAckFile;
+    private static string standbyFile;
+    private static string navigationFile;
     private static bool isPaused;
 
     [DllImport("libc.so.6", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
@@ -98,6 +108,9 @@ internal static class CommercialOverlayProbe
 
     [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr evas_object_text_add(IntPtr evas);
+
+    [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void evas_object_geometry_get(IntPtr obj, out int x, out int y, out int w, out int h);
 
     [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr evas_object_textblock_add(IntPtr evas);
@@ -239,12 +252,29 @@ internal static class CommercialOverlayProbe
             {
                 pausedAckFile = arguments[++index];
             }
+            else if (arguments[index] == "--standby-file" && index + 1 < arguments.Length)
+            {
+                standbyFile = arguments[++index];
+            }
+            else if (arguments[index] == "--navigation-file" && index + 1 < arguments.Length)
+            {
+                navigationFile = arguments[++index];
+            }
+            else if (arguments[index] == "--info-file" && index + 1 < arguments.Length)
+            {
+                infoFile = arguments[++index];
+            }
+            else if (arguments[index] == "--history-file" && index + 1 < arguments.Length)
+            {
+                historyFile = arguments[++index];
+            }
             else
             {
                 PrintUsage();
                 return 2;
             }
         }
+        breakTracker = new BreakTracker(historyFile ?? DefaultHistoryPath);
 
         if (scenePath != null && messageSpecified)
         {
@@ -262,7 +292,9 @@ internal static class CommercialOverlayProbe
             Console.Error.WriteLine("control files must be provided together");
             return 2;
         }
-        if (leaseFile != null && !File.Exists(leaseFile))
+        if (leaseFile != null && !File.Exists(leaseFile) &&
+            (standbyFile == null || !File.Exists(standbyFile) ||
+             DateTime.UtcNow - File.GetLastWriteTimeUtc(standbyFile) >= TimeSpan.FromSeconds(45)))
         {
             Console.Error.WriteLine("lease file is missing");
             return 2;
@@ -336,8 +368,12 @@ internal static class CommercialOverlayProbe
         }
 
         evas_object_pass_events_set(window, 1);
-        evas_object_show(window);
+        if (standbyFile == null && !NavigationRecent()) { evas_object_show(window); breakTracker.Begin(); }
+        else { evas_object_hide(window); isPaused = true; }
         controlledWindow = window;
+        infoRenderer = renderer;
+        RefreshInfo(IntPtr.Zero);
+        ecore_timer_add(1.0, InfoCallback, IntPtr.Zero);
 
         Console.WriteLine(
             "overlay_ready duration_s={0} geometry=0,0 {1}x{2} objects={3} effect_hint_id={4} notification_result={5} efl_log={6}",
@@ -374,6 +410,7 @@ internal static class CommercialOverlayProbe
         // when deleted in a short-lived raw Elementary client. Hide it and let
         // normal process exit close the Evas canvas and Wayland connection.
         evas_object_hide(window);
+        breakTracker.End();
         if (pausedAckFile != null && File.Exists(pausedAckFile)) File.Delete(pausedAckFile);
         diagnostics.Restore();
         Console.WriteLine("overlay_done reason={0}", quitReason);
@@ -386,20 +423,193 @@ internal static class CommercialOverlayProbe
         Console.Error.WriteLine(
             "usage: CommercialOverlayProbe [--seconds N] [--verbose-efl] "
             + "([--message text] | [--scene scene.json]) "
-            + "[--lease-file path --pause-file path --paused-ack-file path]");
+            + "[--lease-file path --pause-file path --paused-ack-file path] "
+            + "[--standby-file heartbeat --navigation-file path] [--info-file path]");
     }
+
+    private static int RefreshInfo(IntPtr data)
+    {
+        // Information has no authority over the window, mute, pause or lease.
+        // Bad/stale detector data only drops the show name; the clock, elapsed
+        // time and today's totals come from this process and its history file.
+        try
+        {
+            breakTracker.Tick();
+            bool hasRoot = false;
+            if (infoFile != null)
+            {
+                FileInfo file = new FileInfo(infoFile);
+                double age = (DateTime.UtcNow - file.LastWriteTimeUtc).TotalSeconds;
+                if (file.Exists && file.Length <= 8192 && age >= -2 && age <= 45)
+                {
+                    try
+                    {
+                        using (JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(infoFile)))
+                        {
+                            JsonElement root = document.RootElement;
+                            hasRoot = root.ValueKind == JsonValueKind.Object;
+                            infoRenderer.UpdatePanel(root, hasRoot, breakTracker);
+                        }
+                    }
+                    catch (JsonException) { hasRoot = false; }
+                }
+            }
+            if (!hasRoot) infoRenderer.UpdatePanel(default(JsonElement), false, breakTracker);
+        }
+        catch (Exception error) when (error is IOException || error is JsonException ||
+            error is InvalidOperationException || error is ArgumentException || error is FormatException ||
+            error is OverflowException || error is UnauthorizedAccessException)
+        {
+            infoRenderer.HideInfo();
+        }
+        return 1;
+    }
+
+    private sealed class BreakTracker
+    {
+        // Persistent on the TV: one [start, end] pair per cover shown. Survives
+        // Mac-side restarts, which is what makes "blocked today" truthful.
+        private readonly string path;
+        private readonly List<double[]> records = new List<double[]>();
+        private double[] current;
+        private DateTime lastWrite = DateTime.MinValue;
+
+        internal BreakTracker(string path)
+        {
+            this.path = path;
+            try
+            {
+                FileInfo file = new FileInfo(path);
+                if (file.Exists && file.Length <= 65536)
+                    using (JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path)))
+                    {
+                        if (document.RootElement.TryGetProperty("breaks", out JsonElement breaks) && breaks.ValueKind == JsonValueKind.Array)
+                            foreach (JsonElement item in breaks.EnumerateArray())
+                            {
+                                if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() != 2) continue;
+                                double start = item[0].GetDouble(), end = item[1].GetDouble();
+                                if (double.IsNaN(start) || double.IsNaN(end) || end < start || start <= 0) continue;
+                                records.Add(new[] {start, end});
+                            }
+                    }
+            }
+            catch (Exception error) when (error is IOException || error is JsonException || error is InvalidOperationException
+                || error is UnauthorizedAccessException || error is FormatException)
+            {
+                records.Clear();
+            }
+        }
+
+        private static double Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+
+        private static bool IsToday(double unix) =>
+            DateTimeOffset.FromUnixTimeSeconds((long)unix).ToLocalTime().Date == DateTime.Now.Date;
+
+        internal void Begin()
+        {
+            if (current != null) return;
+            current = new[] {Now(), Now()};
+            records.Add(current);
+            if (records.Count > 200) records.RemoveRange(0, records.Count - 200);
+            Save(true);
+        }
+
+        internal void Tick()
+        {
+            if (current == null) return;
+            current[1] = Now();
+            Save(false);
+        }
+
+        internal void End()
+        {
+            if (current == null) return;
+            current[1] = Now();
+            current = null;
+            Save(true);
+        }
+
+        internal double CurrentSeconds => current == null ? 0 : Math.Max(0, current[1] - current[0]);
+
+        internal int TodayBreaks
+        {
+            get
+            {
+                int count = 0;
+                foreach (double[] record in records)
+                    if (IsToday(record[0]) && (record == current || record[1] - record[0] >= 5)) count++;
+                return count;
+            }
+        }
+
+        internal double TodaySeconds
+        {
+            get
+            {
+                double total = 0;
+                foreach (double[] record in records)
+                    if (IsToday(record[0])) total += Math.Max(0, record[1] - record[0]);
+                return total;
+            }
+        }
+
+        private void Save(bool force)
+        {
+            if (!force && (DateTime.UtcNow - lastWrite).TotalSeconds < 5) return;
+            lastWrite = DateTime.UtcNow;
+            try
+            {
+                StringBuilder json = new StringBuilder("{\"breaks\":[");
+                for (int i = 0; i < records.Count; i++)
+                {
+                    if (i > 0) json.Append(',');
+                    json.Append('[').Append(records[i][0].ToString("0.###", CultureInfo.InvariantCulture))
+                        .Append(',').Append(records[i][1].ToString("0.###", CultureInfo.InvariantCulture)).Append(']');
+                }
+                json.Append("]}");
+                string temp = path + ".tmp";
+                File.WriteAllText(temp, json.ToString());
+                File.Move(temp, path, true);
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                // History is informational; never let it affect the card itself.
+            }
+        }
+    }
+
+    private static bool NavigationRecent() => navigationFile != null && File.Exists(navigationFile) &&
+        DateTime.UtcNow - File.GetLastWriteTimeUtc(navigationFile) < TimeSpan.FromSeconds(3);
 
     private static int CheckControl(IntPtr data)
     {
         try
         {
+            if (NavigationRecent())
+            {
+                evas_object_hide(controlledWindow);
+                isPaused = true;
+                if (File.Exists(leaseFile)) File.Delete(leaseFile);
+                return 1;
+            }
             if (!File.Exists(leaseFile) ||
                 DateTime.UtcNow - File.GetLastWriteTimeUtc(leaseFile) > TimeSpan.FromSeconds(50))
             {
+                if (standbyFile != null && File.Exists(standbyFile) &&
+                    DateTime.UtcNow - File.GetLastWriteTimeUtc(standbyFile) < TimeSpan.FromSeconds(45))
+                {
+                    evas_object_hide(controlledWindow);
+                    isPaused = true;
+                    breakTracker.End();
+                    if (pausedAckFile != null && File.Exists(pausedAckFile)) File.Delete(pausedAckFile);
+                    return 1;
+                }
                 quitReason = "lease_expired";
                 ecore_main_loop_quit();
                 return 0;
             }
+            // A fresh lease means a cover is being shown: this is a break.
+            breakTracker.Begin();
             bool shouldPause = pauseFile != null && File.Exists(pauseFile);
             if (shouldPause &&
                 DateTime.UtcNow - File.GetLastWriteTimeUtc(pauseFile) > TimeSpan.FromMilliseconds(1500))
@@ -408,11 +618,11 @@ internal static class CommercialOverlayProbe
                 File.Delete(pauseFile);
                 shouldPause = false;
             }
-            if (shouldPause && !isPaused)
+            if (shouldPause)
             {
-                evas_object_hide(controlledWindow);
+                if (!isPaused) evas_object_hide(controlledWindow);
                 isPaused = true;
-                File.WriteAllText(pausedAckFile, "paused");
+                if (!File.Exists(pausedAckFile)) File.WriteAllText(pausedAckFile, "paused");
             }
             else if (!shouldPause && isPaused)
             {
@@ -548,6 +758,127 @@ internal static class CommercialOverlayProbe
     {
         private readonly IntPtr evas;
         private readonly List<IntPtr> retainedStyles = new List<IntPtr>();
+        private readonly List<IntPtr> infoObjects = new List<IntPtr>();
+        private readonly Dictionary<string, IntPtr> infoText = new Dictionary<string, IntPtr>();
+        private readonly List<IntPtr> timelineBars = new List<IntPtr>();
+        private bool infoBuilt;
+        private readonly Dictionary<string, int[]> textBoxes = new Dictionary<string, int[]>();
+
+        internal void HideInfo()
+        {
+            foreach (IntPtr obj in infoObjects) evas_object_hide(obj);
+        }
+
+        private IntPtr InfoRectangle(int x, int y, int width, int height, Rgba color)
+        {
+            IntPtr obj = RequireObject(evas_object_rectangle_add(evas), "info rectangle");
+            evas_object_move(obj, x, y); evas_object_resize(obj, width, height);
+            ApplyColor(obj, color); Show(obj); infoObjects.Add(obj); return obj;
+        }
+
+        // align: 0 = left edge at x, 1 = right edge at x, 2 = centered on x.
+        private void InfoText(string key, int x, int y, int size, string value, Rgba color, int fitWidth = 0, int align = 0)
+        {
+            IntPtr obj = RequireObject(evas_object_text_add(evas), "info text");
+            evas_object_text_font_set(obj, "SamsungOne", size);
+            evas_object_text_text_set(obj, value);
+            evas_object_move(obj, x, y); ApplyColor(obj, color); Show(obj);
+            infoObjects.Add(obj); infoText[key] = obj;
+            textBoxes[key] = new[] {x, y, size, fitWidth, align};
+            SetInfoText(key, value, 160);
+        }
+
+        private void SetInfoText(string key, string value, int limit = 80)
+        {
+            // Plain Evas text: untrusted metadata cannot introduce markup.
+            value = (value ?? "").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
+            if (value.Length > limit) value = value.Substring(0, limit - 1) + "…";
+            IntPtr obj = infoText[key];
+            evas_object_text_text_set(obj, value);
+            int[] box = textBoxes[key];
+            int size = box[2], width, height, x, y;
+            evas_object_text_font_set(obj, "SamsungOne", size);
+            evas_object_geometry_get(obj, out x, out y, out width, out height);
+            // Long text shrinks to its box instead of running off the panel.
+            while (box[3] > 0 && width > box[3] && size > 18)
+            {
+                size--;
+                evas_object_text_font_set(obj, "SamsungOne", size);
+                evas_object_geometry_get(obj, out x, out y, out width, out height);
+            }
+            int left = box[4] == 1 ? box[0] - width : box[4] == 2 ? box[0] - width / 2 : box[0];
+            evas_object_move(obj, left, box[1]);
+        }
+
+        private static string InfoString(JsonElement root, string key)
+        {
+            return root.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() : "";
+        }
+
+        private static double InfoNumber(JsonElement root, string key, double fallback = 0)
+        {
+            return root.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.Number
+                && value.TryGetDouble(out double number) && !double.IsNaN(number) && !double.IsInfinity(number)
+                ? Math.Max(0, Math.Min(86400, number)) : fallback;
+        }
+
+        private static string Duration(double seconds)
+        {
+            return ((int)seconds / 60).ToString(CultureInfo.InvariantCulture) + ":" +
+                ((int)seconds % 60).ToString("00", CultureInfo.InvariantCulture);
+        }
+
+        // The panel shows only what the overlay itself can vouch for: the show
+        // name the detector supplied (optional), the clock, how long this card
+        // has been up, and today's totals from the TV-side break history. The
+        // detector's per-show statistics, timeline and predictions are not shown.
+        internal void UpdatePanel(JsonElement root, bool hasRoot, BreakTracker tracker)
+        {
+            Rgba white = new Rgba(235, 241, 242, 255);
+            Rgba muted = new Rgba(140, 156, 170, 255);
+            Rgba dim = new Rgba(94, 107, 120, 255);
+            if (!infoBuilt)
+            {
+                InfoText("title", 120, 112, 40, "", muted, 1150);
+                InfoText("subtitle", 120, 168, 30, "", dim, 1150);
+                InfoText("clock", 1800, 112, 40, "", muted, 0, 1);
+                InfoText("subline", 960, 604, 44, "Picture and sound return automatically when the show does", muted, 1680, 2);
+                InfoRectangle(120, 860, 1680, 2, new Rgba(28, 38, 48, 255));
+                InfoText("elapsedLabel", 120, 900, 30, "THIS BREAK", dim);
+                InfoText("elapsed", 120, 944, 64, "", white, 520);
+                InfoText("countLabel", 700, 900, 30, "BLOCKED TODAY", dim);
+                InfoText("count", 700, 944, 64, "", white, 520);
+                InfoText("savedLabel", 1280, 900, 30, "AD TIME SKIPPED TODAY", dim);
+                InfoText("saved", 1280, 944, 64, "", white, 520);
+                infoBuilt = true;
+            }
+            foreach (IntPtr obj in infoObjects) Show(obj);
+            string title = hasRoot && root.ValueKind == JsonValueKind.Object ? InfoString(root, "title") : "";
+            string subtitle = hasRoot && root.ValueKind == JsonValueKind.Object ? InfoString(root, "subtitle") : "";
+            bool inferred = title.StartsWith("Likely: ", StringComparison.Ordinal);
+            if (inferred) title = title.Substring(8).Trim();
+            subtitle = subtitle.Replace("  /  ", "  ·  ");
+            if (inferred) subtitle = (subtitle.Length > 0 ? subtitle + "  ·  " : "") + "title identified from the picture";
+            if (title.Length == 0)
+            {
+                evas_object_hide(infoText["title"]);
+                evas_object_hide(infoText["subtitle"]);
+            }
+            else
+            {
+                SetInfoText("title", title.ToUpperInvariant(), 64);
+                SetInfoText("subtitle", subtitle, 96);
+            }
+            SetInfoText("clock", DateTime.Now.ToString("h:mm tt", CultureInfo.InvariantCulture));
+            SetInfoText("elapsed", Duration(tracker.CurrentSeconds));
+            int breaks = tracker.TodayBreaks;
+            SetInfoText("count", breaks == 1 ? "1 break" : breaks.ToString(CultureInfo.InvariantCulture) + " breaks");
+            double saved = tracker.TodaySeconds;
+            SetInfoText("saved", saved < 60
+                ? ((int)saved).ToString(CultureInfo.InvariantCulture) + " sec"
+                : ((int)Math.Round(saved / 60)).ToString(CultureInfo.InvariantCulture) + " min");
+        }
 
         internal SceneRenderer(IntPtr evas)
         {

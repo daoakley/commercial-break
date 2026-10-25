@@ -2,7 +2,7 @@
 
 Commercial Break is an experimental commercial muter for a Samsung Frame TV. A temporary TV-side helper captures a 480×270 screenshot of the active display and sends it to a detector on your computer. The detector asks a Claude Code vision bridge whether the frame shows a commercial. On a confirmed ad, the TV helper mutes the speakers, lowers the active backlight, and displays an opaque "Commercial Break" card. Playback continues underneath. It restores sound and brightness when program content returns.
 
-For YouTube TV, the detector first checks the app's fixed upper-left **Sponsored** pill locally. A strong match mutes on that frame without waiting for Claude; frames without the pill follow the normal vision path. The template is specific to 480×270 captures from the tested YouTube TV app.
+For YouTube TV, the detector first checks the app's fixed upper-left **Sponsored** pill locally. A strong match mutes on that frame without waiting for Claude; frames without the pill follow the normal vision path. The template is specific to 480×270 captures from the tested YouTube TV app. An optional relay (`youtube_events.py`) also subscribes to the app's own second-screen event feed and forwards the "inserted ad started" notices YouTube emits for the ads it inserts itself; the detector can cover on those without waiting for the model. Broadcast breaks carried inside a live channel produce no such notice, so the screenshot path stays primary.
 
 This repository shares **source and reproduction steps**, not an installable Samsung app. The tested path needs temporary root access. The TV-side components are staged manually and disappear or stop after a reboot. Nothing here disables Samsung tracking.
 
@@ -31,7 +31,7 @@ TizenBrew is **not required**. Samsung's developer bridge (`sdb`) is used to sta
 - On the computer: Python 3, Docker Compose, a .NET SDK able to build `netcoreapp3.1` projects, and the [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code/overview) signed into an eligible personal subscription. The TV needs `/usr/bin/dotnet` with a 3.1 runtime.
 - A trusted local network. Do not expose the HTTP detector or bridge to the Internet.
 
-The Docker container does **not** receive your Claude credentials. The host bridge invokes your signed-in Claude Code CLI for each frame. This uses your subscription allowance and sends screenshots and viewing context to Claude. Check your provider's current terms before using this integration.
+The Docker container does **not** receive your Claude credentials. The host bridge keeps a small pool of long-lived Claude Code CLI sessions: the classification instructions travel once as the session's system prompt and each frame is one short turn with the PNG inline, which answers in about 1–2 seconds on the tested setup. This uses your subscription allowance and sends screenshots and viewing context to Claude. Check your provider's current terms before using this integration. `CLAUDE_BRIDGE_MODE=oneshot` selects the older one-process-per-frame path.
 
 ## 1. Set up the computer
 
@@ -54,14 +54,20 @@ curl -fsS http://YOUR_COMPUTER_LAN_IP:28471/health
 
 The health response confirms only that the detector is reachable. It does not prove that the TV helper is running. `./stop-local.sh` stops the computer side.
 
+To also use YouTube TV's inserted-ad notices, set `TV_HOST` in `.env` and run `./start-native.sh`; it starts `youtube_events.py`, which keeps one second-screen connection to the TV and posts validated notices to the detector. `NATIVE_ONSET_MODE` in `.env` decides whether the detector only logs them (`shadow`) or covers on them (`active`). Start with `shadow` and compare the log lines with the screenshot verdicts on real breaks before switching.
+
 ## 2. Build the TV helpers
 
 ```sh
 dotnet build tv-probe/DisplayCaptureProbe.csproj -c Release
+dotnet build tv-acr-probe/AcrFrameProbe.csproj -c Release
 dotnet build tv-overlay/CommercialOverlayProbe.csproj -c Release
+dotnet build tv-navigation/NavigationObserver.csproj -c Release
 ```
 
 The TV helper uses the .NET DLL and runtimeconfig files from each project's `bin/Release/netcoreapp3.1/` directory. Compiled DLLs are deliberately excluded from this repository. The TV must have a compatible .NET runtime.
+
+Two screenshot backends exist. `tv-probe` uses the display-capture call; `tv-acr-probe` uses the call Samsung's content-recognition service uses (`secvideo_api_capture_screen`), which on the tested firmware also works for protected streams, latches a frame in about 150 ms and converts the 720×576 result to the same 480×270 PNG. Both read the finished picture, card included, so a covered screenshot still hides the card briefly; the ACR probe keeps it hidden for about 0.2 s. Select with `CAPTURE_BACKEND` in `tv.env`.
 
 ## 3. Confirm temporary root and obtain your TV's library
 
@@ -103,6 +109,10 @@ done
 "$SDB" push tv-overlay/bin/Release/netcoreapp3.1/CommercialOverlayProbe.dll "$STAGE/CommercialOverlayProbe.dll"
 "$SDB" push tv-overlay/bin/Release/netcoreapp3.1/CommercialOverlayProbe.runtimeconfig.json "$STAGE/CommercialOverlayProbe.runtimeconfig.json"
 "$SDB" push tv-overlay/commercial-break-scene.json "$STAGE/commercial-break-scene.json"
+"$SDB" push tv-acr-probe/bin/Release/netcoreapp3.1/AcrFrameProbe.dll "$STAGE/AcrFrameProbe.dll"
+"$SDB" push tv-acr-probe/bin/Release/netcoreapp3.1/AcrFrameProbe.runtimeconfig.json "$STAGE/AcrFrameProbe.runtimeconfig.json"
+"$SDB" push tv-navigation/bin/Release/netcoreapp3.1/NavigationObserver.dll "$STAGE/NavigationObserver.dll"
+"$SDB" push tv-navigation/bin/Release/netcoreapp3.1/NavigationObserver.runtimeconfig.json "$STAGE/NavigationObserver.runtimeconfig.json"
 "$SDB" push private/libtzcapturec-probe.so "$STAGE/libtzcapturec-probe.so"
 "$SDB" push tv.env "$STAGE/muter-live-tv.env"
 "$TVROOT" --sdb "$SDB" archive-root root "$TV_IP" --command 'cp /home/owner/share/tmp/sdk_tools/libtzcapturec-probe.so /run/libtzcapturec-probe.so; chmod 600 /run/libtzcapturec-probe.so /home/owner/share/tmp/sdk_tools/muter-live-tv.env'
@@ -133,7 +143,9 @@ The default `tv.env.example` limits the first TV run to 15 minutes. If the agent
 
 The detector tracks recent program and ad observations in memory. A matched YouTube TV Sponsored pill mutes on one frame. Without the pill, a model-labeled ad at confidence 0.85 or higher can mute on one frame when a program is established, including after uncertain cutaway frames; otherwise it waits for two distinct ad frames. The prompt requires promotional evidence in the current frame: a change from the previously known show is not itself an ad, and the `program_changed` flag is reserved for `program` frames so that a trailer cannot block its own one-frame mute. A screenshot of the project's own cover card is classified as an obscured frame, never as an ad. There is no generic banner detector.
 
-Uncertain frames request another capture after 2 seconds. During a confirmed break the helper waits 8 seconds after each response before another screenshot, because each covered capture briefly exposes the screen. Two moderate-confidence frames identifying a coherent new program release the cover and reset the learned break cadence; one strong new-program frame can release it while muted. The return may therefore remain covered for several seconds, plus model processing time. Break timing can increase screenshot frequency before an ad but never orders a mute on its own.
+While uncovered the helper sleeps `PROGRAM_IDLE_SECONDS` (default 1 s) after each response, so with a ~1.5 s model answer and ~0.7 s capture a clear ad frame is usually covered within about 4–8 seconds of its start. During a confirmed break the helper waits 8 seconds between screenshots with the display backend, or `COVERED_IDLE_ACR_SECONDS` (default 4) with the ACR backend, because each covered capture briefly blanks the panel. Two program frames are required before anything uncovers; a first program frame is confirmed after 2 seconds. Two moderate-confidence frames identifying a coherent new program release the cover and reset the learned break cadence; one strong new-program frame can release it while muted. Break timing never orders a mute on its own.
+
+Two things shorten the covered wait without weakening that rule. If the native relay reports that an inserted-ad pod ended, the covered helper (which polls `/v1/wake` once a second) takes its next screenshot immediately instead of waiting out the gap; an end inside a pod, followed within 1.5 s by the next ad, is ignored. And the viewer's own unmute is honoured within a second: pressing the remote's mute key so that the speakers come back on drops the card, restores brightness, and stops the helper from re-muting for the rest of that break. Remote navigation (guide, back, channel) releases the cover as well.
 
 The TV helper reads Tizen's current foreground app ID for each frame, using the configured `TV_APP` only if that read fails. A changed channel/title also resets the detector when supplied, but no reliable live YouTube TV channel/title feed was found on this Frame; a native Media Controller client returned `-38` when created in a temporary root shell.
 
@@ -141,7 +153,7 @@ An observed program counts as established even if the model cannot give it a tit
 
 If capture, the network, Docker, or the model fails, the helper releases the mute and active backlight change **that it owns**. The card has a renewable lease and disappears if the helper stops renewing it. A watchdog retries restoration after an unexpected helper stop. The viewer can always use the remote. The helper never pauses playback or changes channels. Test all of these behaviors before extended use on another TV.
 
-The card covers the display screenshot, so it briefly clears for each capture and then returns. The TV helper restores the card about 225 ms after starting native capture, while the PNG finishes writing; shorter latches captured the card itself. The optional `PANEL_MASK_ON_CAPTURE=1` setting uses the TV's **LFD panel-mute control** to turn the physical screen fully black while the card is hidden for a capture during a confirmed ad. The internal screenshot remains clear. The capture helper waits for the physical panel to blank before hiding the card, then waits after the card returns before unmuting the panel, and a separate four-second rescue unmutes the panel if capture exits abruptly. `PANEL_MASK_ON_CAPTURE=0` is the default, and the setting must be re-enabled whenever the temporary TV agent is restarted. Active backlight at 0/50 was tested as a mask first but left the image clearly visible. A blur or noise overlay would appear in the captured image as well and cannot be reliably removed from the screenshot. The direct video-plane capture path refused a protected YouTube TV stream, so the display screenshot remains the verified source for that app.
+The card covers the display screenshot, so it briefly clears for each capture and then returns. With the display backend the card returns about 225 ms after the capture starts; shorter latches captured the card itself. With the ACR backend the frame is latched inside the capture call, about 150 ms. The optional `PANEL_MASK_ON_CAPTURE=1` setting uses the TV's **LFD panel-mute control** to turn the physical screen fully black while the card is hidden. The internal screenshot remains clear. The capture helper waits for the physical panel to blank before hiding the card, then waits after the card returns before unmuting the panel, and a separate four-second rescue unmutes the panel if capture exits abruptly. On the tested Frame the panel followed the command within 50 ms each way: margins of 50/30 ms never showed the picture and 0/0 ms did once, so the ACR probe defaults to 100 ms before hiding the card and 60 ms after it returns (`ACR_PANEL_LEAD_MS`, `ACR_PANEL_RETURN_MS`). `PANEL_MASK_ON_CAPTURE=0` is the default, and the setting must be re-enabled whenever the temporary TV agent is restarted. Active backlight at 0/50 was tested as a mask first but left the image clearly visible. A blur or noise overlay would appear in the captured image as well. Every capture path on this TV reads the finished picture: the video-plane call and the "post" variant refuse protected streams, and the content-recognition path includes overlays, so no path can see beneath the card.
 
 Claude classifications can miss ads or identify them late. This is a prototype, not a guarantee that every commercial will be hidden.
 
@@ -154,7 +166,7 @@ The repository contains only the core commercial-break source, tests, and exampl
 Run the included policy and bridge tests with:
 
 ```sh
-python3 -m unittest -v test_server.py test_claude_bridge.py test_tv_backlight.py
+python3 -m unittest discover -p 'test_*.py'
 ```
 
 This project builds on the independent [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root) project and Samsung's developer tools. Those dependencies are not bundled here.
