@@ -25,6 +25,10 @@ class LocalSignalsTests(unittest.TestCase):
                 y, x = 108 + (i // 110) * 2, 130 + (i % 110) * 2
                 rows[y][x * 3:x * 3 + 3] = b'\xff\xff\xff'
         self.assertTrue(own_card(visual_features(png(rows))))
+        # Rich information stays inside fixed margins, below the title mask.
+        for y in range(190, 240):
+            rows[y][75 * 3:405 * 3] = b'\x90' * (330 * 3)
+        self.assertTrue(own_card(visual_features(png(rows))))
         # The same glyphs over ordinary video must not conceal real evidence.
         rows[:80] = [bytearray(b'\xc0' * 1440) for _ in range(80)]
         self.assertFalse(own_card(visual_features(png(rows))))

@@ -1,16 +1,11 @@
 # Context and fast detection — 24 October 2026
 
-**Live trial suspended at approximately 18:41 EDT.** The owner reported a
-repeated black-screen/program-image loop. The detector was continuously
-returning UNMUTE during the reported period, so decision flapping does not
-explain it. The experimental TV helpers were stopped, panel mute released,
-and owned sound/brightness restored. Next-start settings reverted to v1 with
-fast, persistent-capture and warm-overlay modes disabled; the original
-one-shot capture binary was restored. The blocker remains stopped pending
-confirmation that the physical picture is steady. The precise display-side
-cause is not yet isolated. Do not enable the fast-path recipe below as a
-validated configuration. Earlier timing measurements do not demonstrate
-display stability. PR #5 remains a draft.
+**Current live path: sequential capture, experimental fast path disabled.**
+The 18:41 EDT fast/warm trial caused a black/show loop. That combination was
+rolled back; the sequential helper is now running with the navigation and
+context safeguards. The information card is active. The precise cause of the
+experimental display regression remains unresolved. Do not use the fast-path
+recipe below as a validated configuration. PR #5 remains a draft.
 
 The aim is earlier commercial blocking with fewer false covers, especially
 after channel changes and during programs with banners. A 10× improvement

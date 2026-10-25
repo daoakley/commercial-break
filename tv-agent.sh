@@ -196,6 +196,7 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   response_at=$(uptime_now)
   next_interval=$INTERVAL_SECONDS
   if [ "$request_ok" -eq 1 ] && [ -f "$RESPONSE_HEADERS" ]; then
+    if command -v overlay_update_info >/dev/null 2>&1; then overlay_update_info "$RESPONSE_HEADERS"; fi
     suggested=$(awk 'tolower($1)=="x-next-capture-seconds:" {gsub("\r", "", $2); print $2}' "$RESPONSE_HEADERS" | tail -1)
     case "$suggested" in 1|2|3|4|5|8|15) next_interval=$suggested ;; esac
   fi

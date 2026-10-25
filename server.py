@@ -69,7 +69,7 @@ SYSTEM_PROMPT = """Classify one TV frame as ad, program, or uncertain using the 
 First distinguish the main video from graphics over it. A corner tune-in promotion such as 'ALL NEW Tonight 10/9c' over an ongoing show is in_program_promotion, label program, even when it promotes a DIFFERENT show. This applies to every category, including HGTV renovation/reality shows, sports and news. The scheduled time in a corner banner does not make the underlying video an ad. Use full_screen_ad only when the primary video itself is a standalone commercial or promo; a small banner is never sufficient. When a coherent new show replaces the old one, prefer that current visual evidence over previous ad labels.
 A scheduled new show or in-app channel change can occur without a change in app ID or supplied title. The prior known program, earlier ad labels, and a scene unlike the prior show are not ad evidence by themselves. A coherent dramatic, comedic, documentary, sports, or news scene is program even if it is clearly a different show; set program_changed true when a show/channel switch is plausible. A network logo alone is not an ad cue.
 Commercials include station promos, trailers, bumpers, and sponsor pitches, but require identifiable promotional intent in the current frame: a product or service pitch, advertiser brand, price, URL, phone number, call to action, or an obvious promo/trailer cue. Use high ad confidence for an unambiguous external pitch; do not require a full banner. Do not label an in-show sponsor bug, sports ticker, news lower third, show title/website, product used within an editorial segment, or ordinary scene cut as an ad just because a brand or text is present. If this frame cannot distinguish a promo from a new show, use uncertain. Black frames, menus, guide, and loading are uncertain. Give calibrated confidence, not automatic 0.95.
-The TV may show this project's own cover card: an almost-black full screen with a thin muted-green horizontal line above centered white text reading Commercial Break. That card hides the underlying video. Label it uncertain, not ad or program; it is not evidence that a broadcast ad is still playing.
+The TV may show this project's own cover card: an almost-black full screen with a thin muted-green horizontal line above centered white text reading Commercial Break. It may also include show context, break statistics and a viewing timeline below the title. That card hides the underlying video. Label it uncertain, not ad or program; it is not evidence that a broadcast ad is still playing.
 Set program_changed true only when the current frame is labeled program and appears to be a different show. For ad and uncertain labels, always set program_changed false: ads normally look different from the show, and that difference is not a program change.
 Use the category expectations and local signals as context, not as proof: brightness, cuts, logo loss and audio changes occur in programs too. Preserve a sports game or news report that remains visible under sponsor graphics or alongside a split-screen advertisement. Category, program name and actual broadcast start may be unknown; do not invent them. A title inferred visually is a hypothesis, not confirmed metadata. Do not reuse an ad's title as the ongoing show's identity.
 Respond with exactly one JSON object containing label (ad|program|uncertain), confidence (0..1), program, evidence, program_changed (boolean), category (sports|news|movie|series|documentary|kids|music|unknown), and presentation (program|full_screen_ad|in_program_promotion|split_screen|menu|own_card|unknown)."""
@@ -134,6 +134,15 @@ class Detector:
                          viewing_context=self.states[tv_id].viewing.snapshot(self.clock(),
                              dict(channel=identity.channel, title=identity.title)))
                     for tv_id, identity in self.identities.items() if tv_id in self.states]
+
+    def overlay_info(self, tv_id, context):
+        with self.states_lock:
+            identity = self.identities.get(tv_id)
+            state = self.states.get(tv_id)
+            if not identity or not state or context.get("session", "") != identity.session:
+                return {}
+            return state.viewing.overlay_info(self.clock(), dict(
+                app=identity.app, channel=identity.channel, title=identity.title))
 
     def next_interval(self, tv_id):
         state = self.state(tv_id)
@@ -483,6 +492,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(action)))
         self.send_header("X-Frame-Label", verdict.label)
         self.send_header("X-Frame-Confidence", f"{verdict.confidence:.2f}")
+        card = self.detector.overlay_info(tv_id, context)
+        payload = base64.b64encode(json.dumps(card, ensure_ascii=True, separators=(",", ":")).encode()).decode()
+        if len(payload) <= 8192:
+            self.send_header("X-Overlay-Info", payload)
         self.send_header("X-Next-Capture-Seconds", str(next_interval))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()

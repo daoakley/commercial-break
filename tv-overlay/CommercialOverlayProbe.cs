@@ -34,6 +34,9 @@ internal static class CommercialOverlayProbe
 
     private static readonly EcoreTaskCallback QuitCallback = QuitMainLoop;
     private static readonly EcoreTaskCallback ControlCallback = CheckControl;
+    private static readonly EcoreTaskCallback InfoCallback = RefreshInfo;
+    private static SceneRenderer infoRenderer;
+    private static string infoFile;
     private static readonly EcoreThreadSafeCallback ThreadSafeQuitCallback =
         QuitMainLoopFromSignal;
     private static int quitRequested;
@@ -249,6 +252,10 @@ internal static class CommercialOverlayProbe
             {
                 navigationFile = arguments[++index];
             }
+            else if (arguments[index] == "--info-file" && index + 1 < arguments.Length)
+            {
+                infoFile = arguments[++index];
+            }
             else
             {
                 PrintUsage();
@@ -351,6 +358,12 @@ internal static class CommercialOverlayProbe
         if (standbyFile == null && !NavigationRecent()) evas_object_show(window);
         else { evas_object_hide(window); isPaused = true; }
         controlledWindow = window;
+        if (infoFile != null)
+        {
+            infoRenderer = renderer;
+            RefreshInfo(IntPtr.Zero);
+            ecore_timer_add(1.0, InfoCallback, IntPtr.Zero);
+        }
 
         Console.WriteLine(
             "overlay_ready duration_s={0} geometry=0,0 {1}x{2} objects={3} effect_hint_id={4} notification_result={5} efl_log={6}",
@@ -400,7 +413,30 @@ internal static class CommercialOverlayProbe
             "usage: CommercialOverlayProbe [--seconds N] [--verbose-efl] "
             + "([--message text] | [--scene scene.json]) "
             + "[--lease-file path --pause-file path --paused-ack-file path] "
-            + "[--standby-file heartbeat --navigation-file path]");
+            + "[--standby-file heartbeat --navigation-file path] [--info-file path]");
+    }
+
+    private static int RefreshInfo(IntPtr data)
+    {
+        // Information has no authority over the window, mute, pause or lease.
+        // Bad/stale data removes only the optional information panel.
+        try
+        {
+            FileInfo file = new FileInfo(infoFile);
+            double age = (DateTime.UtcNow - file.LastWriteTimeUtc).TotalSeconds;
+            if (!file.Exists || file.Length > 8192 || age < -2 || age > 45)
+                infoRenderer.HideInfo();
+            else
+                using (JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(infoFile)))
+                    infoRenderer.UpdateInfo(document.RootElement, Math.Max(0, age));
+        }
+        catch (Exception error) when (error is IOException || error is JsonException ||
+            error is InvalidOperationException || error is ArgumentException || error is FormatException ||
+            error is OverflowException || error is UnauthorizedAccessException)
+        {
+            infoRenderer.HideInfo();
+        }
+        return 1;
     }
 
     private static bool NavigationRecent() => navigationFile != null && File.Exists(navigationFile) &&
@@ -580,6 +616,129 @@ internal static class CommercialOverlayProbe
     {
         private readonly IntPtr evas;
         private readonly List<IntPtr> retainedStyles = new List<IntPtr>();
+        private readonly List<IntPtr> infoObjects = new List<IntPtr>();
+        private readonly Dictionary<string, IntPtr> infoText = new Dictionary<string, IntPtr>();
+        private readonly List<IntPtr> timelineBars = new List<IntPtr>();
+        private bool infoBuilt;
+
+        internal void HideInfo()
+        {
+            foreach (IntPtr obj in infoObjects) evas_object_hide(obj);
+        }
+
+        private IntPtr InfoRectangle(int x, int y, int width, int height, Rgba color)
+        {
+            IntPtr obj = RequireObject(evas_object_rectangle_add(evas), "info rectangle");
+            evas_object_move(obj, x, y); evas_object_resize(obj, width, height);
+            ApplyColor(obj, color); Show(obj); infoObjects.Add(obj); return obj;
+        }
+
+        private void InfoText(string key, int x, int y, int size, string value, Rgba color)
+        {
+            IntPtr obj = RequireObject(evas_object_text_add(evas), "info text");
+            evas_object_text_font_set(obj, "SamsungOne", size);
+            evas_object_text_text_set(obj, value);
+            evas_object_move(obj, x, y); ApplyColor(obj, color); Show(obj);
+            infoObjects.Add(obj); infoText[key] = obj;
+        }
+
+        private void SetInfoText(string key, string value, int limit = 80)
+        {
+            // Plain Evas text: untrusted metadata cannot introduce markup.
+            value = (value ?? "").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
+            if (value.Length > limit) value = value.Substring(0, limit - 1) + "…";
+            evas_object_text_text_set(infoText[key], value);
+        }
+
+        private static string InfoString(JsonElement root, string key)
+        {
+            return root.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() : "";
+        }
+
+        private static double InfoNumber(JsonElement root, string key, double fallback = 0)
+        {
+            return root.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.Number
+                && value.TryGetDouble(out double number) && !double.IsNaN(number) && !double.IsInfinity(number)
+                ? Math.Max(0, Math.Min(86400, number)) : fallback;
+        }
+
+        private static string Duration(double seconds)
+        {
+            return ((int)seconds / 60).ToString(CultureInfo.InvariantCulture) + ":" +
+                ((int)seconds % 60).ToString("00", CultureInfo.InvariantCulture);
+        }
+
+        internal void UpdateInfo(JsonElement root, double age)
+        {
+            if (root.ValueKind != JsonValueKind.Object || InfoNumber(root, "version") != 1)
+            { HideInfo(); return; }
+            Rgba white = new Rgba(235, 241, 242, 255);
+            Rgba muted = new Rgba(140, 156, 170, 255);
+            Rgba green = new Rgba(158, 187, 175, 255);
+            Rgba blue = new Rgba(94, 131, 166, 255);
+            Rgba amber = new Rgba(203, 161, 99, 255);
+            if (!infoBuilt)
+            {
+                InfoText("title", 300, 300, 36, "", white);
+                InfoText("subtitle", 300, 354, 24, "", muted);
+                InfoText("elapsedLabel", 300, 654, 19, "SINCE BREAK DETECTED", muted);
+                InfoText("elapsed", 300, 692, 42, "", white);
+                InfoText("countLabel", 810, 654, 19, "RECENT BREAKS COVERED", muted);
+                InfoText("count", 810, 692, 42, "", white);
+                InfoText("typicalLabel", 1320, 654, 19, "TYPICAL BREAK", muted);
+                InfoText("typical", 1320, 692, 42, "", white);
+                InfoText("history", 300, 782, 19, "", muted);
+                InfoRectangle(300, 825, 1320, 12, new Rgba(38, 48, 59, 255));
+                for (int i = 0; i < 80; i++) timelineBars.Add(InfoRectangle(300, 825, 1, 12, green));
+                InfoRectangle(300, 879, 12, 12, blue);
+                InfoText("programLegend", 325, 872, 20, "Program", muted);
+                InfoRectangle(510, 879, 12, 12, amber);
+                InfoText("adLegend", 535, 872, 20, "Ad observed", muted);
+                InfoRectangle(790, 879, 12, 12, green);
+                InfoText("coverLegend", 815, 872, 20, "Cover requested", muted);
+                InfoRectangle(1120, 879, 12, 12, new Rgba(70, 80, 90, 255));
+                InfoText("unknownLegend", 1145, 872, 20, "Unknown / unsampled", muted);
+                InfoText("fact", 300, 952, 22, "", muted);
+                infoBuilt = true;
+            }
+            foreach (IntPtr obj in infoObjects) Show(obj);
+            foreach (IntPtr obj in timelineBars) evas_object_hide(obj);
+            string title = InfoString(root, "title");
+            SetInfoText("title", title.Length > 0 ? title : "Your viewing session", 64);
+            SetInfoText("subtitle", InfoString(root, "subtitle"), 80);
+            double elapsed = InfoNumber(root, "break_elapsed", -1);
+            SetInfoText("elapsed", elapsed >= 0 ? Duration(elapsed + age) : "—");
+            SetInfoText("count", InfoNumber(root, "break_count").ToString("0", CultureInfo.InvariantCulture));
+            double typical = InfoNumber(root, "typical_seconds");
+            SetInfoText("typical", typical > 0 ? "~" + Duration(typical) : "Learning", 14);
+            SetInfoText("history", "VIEWING HISTORY  /  " + InfoNumber(root, "timeline_minutes", 1).ToString("0") + " MIN WINDOW");
+            string fact = InfoString(root, "fact");
+            int page = (int)(Math.Max(0, elapsed) + age) / 12 % 3;
+            if (page == 1) fact = "Building this program's profile • " + InfoNumber(root, "observed_minutes").ToString("0") + " minutes since first observation.";
+            double cadence = InfoNumber(root, "cadence_seconds");
+            if (page == 1 && cadence > 0) fact = "Observed breaks began roughly " + Duration(cadence) + " apart in this program. Timing is an estimate.";
+            if (page == 2) fact = "Timeline follows sampled frames. Break timing is learned; it is never a guaranteed countdown.";
+            SetInfoText("fact", fact, 108);
+            if (root.TryGetProperty("timeline", out JsonElement segments) && segments.ValueKind == JsonValueKind.Array)
+            {
+                int i = 0;
+                foreach (JsonElement segment in segments.EnumerateArray())
+                {
+                    if (i >= 80) break;
+                    if (segment.ValueKind != JsonValueKind.Array || segment.GetArrayLength() != 3) continue;
+                    double left = segment[0].GetDouble(), right = segment[1].GetDouble();
+                    if (double.IsNaN(left) || double.IsNaN(right) || left < 0 || right > 1 || right <= left) continue;
+                    string kind = segment[2].GetString();
+                    if (kind != "program" && kind != "ad" && kind != "covered") continue;
+                    IntPtr bar = timelineBars[i++];
+                    ApplyColor(bar, kind == "covered" ? green : kind == "ad" ? amber : blue);
+                    evas_object_move(bar, 300 + (int)(1320 * left), 825);
+                    evas_object_resize(bar, Math.Max(1, (int)(1320 * (right - left))), 12);
+                    Show(bar);
+                }
+            }
+        }
 
         internal SceneRenderer(IntPtr evas)
         {

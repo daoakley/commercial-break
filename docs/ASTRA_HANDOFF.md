@@ -1,29 +1,38 @@
 # Commercial Break handoff — 24 October 2026
 
-## Current incident — experimental trial stopped
+## Current live configuration — sequential path active
 
-At approximately 18:41 EDT the owner reported a black-screen/program-image
-loop. The fast helper was stopped and panel mute, owned speaker mute and
-brightness were released. Do not automatically restart the failed fast
-configuration. The log showed continuous UNMUTE decisions during
-the reported period. The specific capture/display cause remains unproven.
-Next-start settings now select v1, with FAST_MODE, CAPTURE_PERSISTENT and
-OVERLAY_WARM disabled, and the original one-shot capture binary restored.
-The classifier/navigation safeguards remain available. Confirm the physical
-picture is steady before resuming any helper. Earlier sections describe the
-implementation and measurements, not a currently running fast configuration.
+The sequential TV helper is running again with `FAST_MODE=0`,
+`CAPTURE_PERSISTENT=0`, `OVERLAY_WARM=0`, `ENABLE_REALTIME=0`, and
+`NAVIGATION_OBSERVER=1`. The earlier fast/warm trial caused a black/show loop
+and remains disabled. Do not restart that experimental combination.
+
+The information card was enabled at approximately 21:39 EDT after a bounded
+native preview and recognition check. It displays provenance-aware context,
+observed timing and a sampled timeline; see [Information card](OVERLAY_INFORMATION.md).
+The native YouTube ad-event research remains observation-only and is not a
+replacement for the current visual detector. PR #5 is still a draft.
 
 Commercial Break is a free experimental commercial muter for one owner's 2022 Samsung Frame (`QN65LS03BAFXZA`, `T-PTMAKUC-1720.7`, Tizen 6.5). This repository has source and reproduction steps. The owner's live TV uses the same core detector source with private configuration, TV-specific binaries, and local capture logs kept outside Git. Read [README.md](../README.md) before changing the implementation.
 
 ## Working system
 
-The TV uses a temporary-root helper, enabled through [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root), to call its own display-capture API. A process-local, hash-checked copy of one TV library permits the .NET capture probe to take a 480×270 screenshot; no installed firmware library is modified. The TV sends each frame and foreground app ID to an authenticated Docker detector on the owner's Mac. A separate host bridge uses the owner's signed-in Claude Code CLI to classify frames. The Docker container has no Claude credentials. On confirmed ads, the TV agent mutes its speakers, dims only the active backlight, and shows a plain opaque `Commercial Break` card. Playback continues. The helper restores settings on program return or service failure; the card has an expiring lease and a watchdog backs up restoration. The viewer can override mute with the remote.
+The TV uses a temporary-root helper, enabled through [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root), to call its own display-capture API. A process-local, hash-checked copy of one TV library permits the .NET capture probe to take a 480×270 screenshot; no installed firmware library is modified. The TV sends each frame and foreground app ID to an authenticated Docker detector on the owner's Mac. A separate host bridge uses the owner's signed-in Claude Code CLI to classify frames. The Docker container has no Claude credentials. On confirmed ads, the TV agent mutes its speakers, dims only the active backlight, and shows an opaque `Commercial Break` card with optional viewing information. Playback continues. The helper restores settings on program return or service failure; the card has an expiring lease and a watchdog backs up restoration. The viewer can override mute with the remote.
 
 The local YouTube TV `Sponsored` badge detector can mute without Claude. The live TV uses the sequential `/v1/frame` path with `FAST_MODE=0`, `CAPTURE_PERSISTENT=0`, `OVERLAY_WARM=0`, `ENABLE_REALTIME=0`, and `NAVIGATION_OBSERVER=1`. The earlier fast capture/warm-overlay experiment caused a black/show loop and was rolled back; its timing measurements do not establish stable production performance. Physical-panel masking remains enabled during covered captures. No animation is in use or planned. Read [Detection design](DETECTION_DESIGN.md) for the experimental implementation, measurements, flags and rollback.
 
 This does **not** disable Samsung ACR or other tracking. Frames and viewing context go to Claude. Any private audit screenshots/audio remain on the owner's machine and must not enter this public repository. A TV restart or standby may stop the temporary agent; Docker health alone does not prove the TV agent is running.
 
 ## Latest change and evidence
+
+A bounded paired-client experiment subsequently connected to the running
+YouTube TV app through its advertised DIAL application status and YouTube
+Lounge. It received live now-playing/content identity, playback position,
+duration, seekable bounds and audio-track events. No ad-state event was
+observed during that 90-second window. This is a promising continuous source;
+it is not yet connected to production context or mute, and it does not prove
+a native ad boundary. The observer disconnected after the bounded test.
+
 
 Astra’s audit found that the bridge truncated instructions at 1,600 characters, so earlier offline prompt successes did not establish that all safeguards reached the live model. Complete instructions and JSON context now pass through, with explicit size rejection. Local own-card filtering prevents a contaminated screenshot from renewing ad evidence; seven saved card frames were inspected, six formerly labeled as ads.
 

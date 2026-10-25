@@ -47,12 +47,59 @@ class ViewingContext:
     durations: list = field(default_factory=list)
     active_break: bool = False
     can_start_break: bool = True
+    timeline: list = field(default_factory=list)
+
+    def record_timeline(self, at, label, covered):
+        # Samples are not continuous ground truth. Never bridge long outages.
+        if self.timeline and at <= self.timeline[-1][0]:
+            return
+        self.timeline = (self.timeline + [[at, label, bool(covered)]])[-240:]
+
+    def overlay_info(self, now, metadata):
+        context = self.snapshot(now, metadata)
+        start = max(now - 1800, self.timeline[0][0] if self.timeline else now - 60)
+        span = max(60, now - start)
+        segments = []
+        for i, (at, label, covered) in enumerate(self.timeline):
+            end = min(now, at + 30, self.timeline[i + 1][0] if i + 1 < len(self.timeline) else now)
+            left, right = max(start, at), end
+            if right <= left:
+                continue
+            kind = "covered" if covered else label
+            item = [round((left - start) / span, 4), round((right - start) / span, 4), kind]
+            if segments and segments[-1][2] == kind and segments[-1][1] == item[0]:
+                segments[-1][1] = item[1]
+            else:
+                segments.append(item)
+        # Display only; no countdown, decision, or lease-renewal authority.
+        name = context["show"]["name"] or ""
+        source = context["show"]["source"]
+        channel = str(metadata.get("channel") or "")[:60]
+        app = str(metadata.get("app") or "")
+        service = "YouTube TV" if "cobalt-yttv" in app else "Current source"
+        category = self.category.title() if self.category != "unknown" else "Learning this program"
+        typical = prediction(self.durations)
+        gaps = [b - a for a, b in zip(self.starts, self.starts[1:]) if 60 <= b - a <= 3600]
+        cadence = prediction(gaps)
+        return {"version": 1, "epoch": self.epoch,
+                "title": (("Likely: " if source == "vision_inference" else "") + name)[:90],
+                "subtitle": "  /  ".join(v for v in [channel or service, category] if v),
+                "break_elapsed": max(0, round(now - self.break_start)) if self.active_break else None,
+                "break_count": len(self.starts),
+                "typical_seconds": typical["median_seconds"] if typical else None,
+                "cadence_seconds": cadence["median_seconds"] if cadence else None,
+                "observed_minutes": round(max(0, now - self.first_seen) / 60) if self.first_seen else 0,
+                "timeline": segments[-80:],
+                "timeline_minutes": round(span / 60),
+                "fact": CATEGORIES[self.category].split(". ")[0] + "."}
 
     def reset(self):
         fresh = ViewingContext(epoch=self.epoch + 1)
         self.__dict__.update(fresh.__dict__)
 
     def observe(self, verdict, at, muted, *, is_error=False):
+        label = verdict.label if verdict.label in {"program", "ad"} and verdict.confidence >= .7 else "unknown"
+        self.record_timeline(at, "unknown" if is_error else label, muted and not is_error)
         if is_error:
             # A fail-open release is not evidence that a broadcast break ended.
             self.active_break = False

@@ -62,7 +62,7 @@ def rgb_rows(png):
 
 def visual_features(png):
     """Fixed-size spatial sample preserves central scene vs border differences."""
-    grid, card_pixels, dark = [], [], []
+    grid, card_pixels, dark, margins = [], [], [], []
     for y, (row, bpp) in enumerate(rgb_rows(png)):
         def luma(x):
             at = x * bpp
@@ -73,9 +73,11 @@ def visual_features(png):
             card_pixels.extend(int(luma(x) > 50) for x in range(130, 350, 2))
         if y % 20 == 0 and not 100 <= y <= 150:
             dark.extend(luma(x) < 16 for x in range(20, 460, 20))
+            margins.extend(luma(x) < 16 for x in (20, 40, 440, 460))
     return {"grid": grid, "mean_luma": sum(grid) / len(grid),
             "black_fraction": sum(v < 16 for v in grid) / len(grid),
-            "card_pixels": card_pixels, "outer_dark_fraction": sum(dark) / len(dark)}
+            "card_pixels": card_pixels, "outer_dark_fraction": sum(dark) / len(dark),
+            "card_margin_dark_fraction": sum(margins) / len(margins)}
 
 
 _COVER_MASK = None
@@ -84,7 +86,7 @@ def own_card(features):
     if _COVER_MASK is None:
         _COVER_MASK = json.loads(Path(__file__).with_name("cover_mask.json").read_text())["mask"]
     bits = features["card_pixels"]
-    if len(bits) != len(_COVER_MASK) or features["outer_dark_fraction"] < .98:
+    if len(bits) != len(_COVER_MASK) or features.get("card_margin_dark_fraction", features["outer_dark_fraction"]) < .98:
         return False
     union = sum(a or b for a, b in zip(bits, _COVER_MASK))
     intersection = sum(a and b for a, b in zip(bits, _COVER_MASK))
