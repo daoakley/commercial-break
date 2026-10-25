@@ -1,3 +1,5 @@
+> **Current project status and Claude handoff:** read [HANDOFF.md](HANDOFF.md). Newer source and comprehensive documentation are in draft PR #5; the 20+ second detection delay and suspended fast-display experiment remain unresolved.
+
 # Commercial Break
 
 **Handoff status (24 October 2026):** ad-onset delay remains unresolved. The development source differs from the live detector, and the earlier fast-display trial remains suspended. Start with [current status](docs/PROJECT_STATUS.md), [architecture](docs/ARCHITECTURE.md), [operations/dashboard](docs/OPERATIONS.md), [research](docs/RESEARCH.md), and [Claude handoff](docs/CLAUDE_HANDOFF.md). The verified deployed detector source is preserved under [reference](reference/deployed-2026-10-24/). PR #5 is a draft; this is not a validated release.
