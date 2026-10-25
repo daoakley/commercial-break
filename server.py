@@ -19,6 +19,7 @@ from local_signals import visual_features, own_card
 import zlib
 from viewing_context import ViewingContext, CATEGORIES, PRESENTATIONS
 from playback_identity import PlaybackIdentity
+from native_ads import NativeAds
 
 MAX_FRAME_BYTES = 1_000_000
 MIN_CONFIDENCE = 0.70
@@ -72,6 +73,7 @@ Commercials include station promos, trailers, bumpers, and sponsor pitches, but 
 The TV may show this project's own cover card: an almost-black full screen with a thin muted-green horizontal line above centered white text reading Commercial Break. It may also include show context, break statistics and a viewing timeline below the title. That card hides the underlying video. Label it uncertain, not ad or program; it is not evidence that a broadcast ad is still playing.
 Set program_changed true only when the current frame is labeled program and appears to be a different show. For ad and uncertain labels, always set program_changed false: ads normally look different from the show, and that difference is not a program change.
 Use the category expectations and local signals as context, not as proof: brightness, cuts, logo loss and audio changes occur in programs too. Preserve a sports game or news report that remains visible under sponsor graphics or alongside a split-screen advertisement. Category, program name and actual broadcast start may be unknown; do not invent them. A title inferred visually is a hypothesis, not confirmed metadata. Do not reuse an ad's title as the ongoing show's identity.
+For program frames, actively identify the film, series, or game when recognizable from characters, actors, team names or title graphics. Put only the likely specific title in program (without a “likely” suffix); this is explicitly displayed as an inference. If the exact title is not recognizable, use a concise descriptive label such as "Unidentified comedy film" or "College football (teams unknown)" rather than an empty string. Reuse a prior likely title only when the current scene remains consistent with it. Do not name the ongoing show from an advertisement.
 Respond with exactly one JSON object containing label (ad|program|uncertain), confidence (0..1), program, evidence, program_changed (boolean), category (sports|news|movie|series|documentary|kids|music|unknown), and presentation (program|full_screen_ad|in_program_promotion|split_screen|menu|own_card|unknown)."""
 
 
@@ -115,6 +117,11 @@ class Detector:
         self.states = {}
         self.identities = {}
         self.states_lock = threading.Lock()
+        self.native_ads = NativeAds(self.clock)
+
+    def observe_native(self, data):
+        with self.states_lock:
+            return self.native_ads.observe(data, self.identities.get(data.get("tv_id")))
 
     def state(self, tv_id):
         with self.states_lock:
@@ -131,6 +138,7 @@ class Detector:
         with self.states_lock:
             return [dict(tv_id=tv_id, identity=identity.snapshot(),
                          muted_by_detector=self.states[tv_id].muted_by_detector,
+                         native_ad_metrics=self.native_ads.metrics(),
                          viewing_context=self.states[tv_id].viewing.snapshot(self.clock(),
                              dict(channel=identity.channel, title=identity.title)))
                     for tv_id, identity in self.identities.items() if tv_id in self.states]
@@ -149,29 +157,16 @@ class Detector:
         now = self.clock()
         with state.lock:
             if state.capture_obscured:
-                return 2
+                return 1
             if state.model_unavailable:
                 return 15
             if state.muted_by_detector:
                 # Avoid repeatedly uncovering the ad behind the card. Once a
                 # program frame appears, confirm it promptly before unmuting.
                 return 2 if state.program_streak == 1 else 8
-            if state.ad_streak or state.program_streak == 1:
-                return 2
-            if state.last_verdict == "uncertain":
-                return 2
-            starts = state.ad_starts
-            if len(starts) >= 3:
-                gaps = [b - a for a, b in zip(starts, starts[1:])]
-                cadence = statistics.median(gaps)
-                drift = statistics.median(abs(gap - cadence) for gap in gaps)
-                if 60 <= cadence <= 1800 and drift <= cadence * .25:
-                    expected = starts[-1] + cadence
-                    if expected - 60 <= now <= expected + 90:
-                        return 3
-            if state.last_ad_end_at and now - state.last_ad_end_at < 60:
-                return 8
-            return 5
+            # Normal playback gets a short idle gap after each completed
+            # analysis. Predictions must never slow this onset-sensitive path.
+            return 1
 
     def process(self, tv_id, png, context):
         at = self.clock()
@@ -274,9 +269,16 @@ class Detector:
             # This fixed YouTube TV UI badge is stronger evidence than a scene
             # change and can be checked locally before the slower vision agent.
             badge_hit = app == "com.samsung.tv.cobalt-yttv" and sponsored_badge.present(png)
+            native_hit = self.native_ads.take(tv_id, session, app, now, context.get("playback_identity", {}).get("epoch")) if not state.muted_by_detector else None
             if badge_hit:
                 verdict = Verdict("ad", 0.99, evidence="YouTube TV Sponsored badge")
                 state.model_unavailable = False
+            elif native_hit and not state.muted_by_detector:
+                # One-shot onset only. Subsequent visual checks still determine
+                # whether advertising continues or the show has returned.
+                verdict = Verdict("ad", .99, evidence="native YouTube ad onset")
+                state.model_unavailable = False
+                print("native_onset_used age_ms=" + str(native_hit["age_ms"]), flush=True)
             else:
                 try:
                     verdict = self.vision.classify(png, model_context)
@@ -362,7 +364,7 @@ class Detector:
                 and bool(state.first_program_seen_at)
                 and not verdict.program_changed
             )
-            if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program or badge_hit):
+            if not state.muted_by_detector and (state.ad_streak >= 2 or strong_ad_against_known_program or badge_hit or native_hit):
                 state.muted_by_detector = True
                 if not state.ad_starts or state.ad_candidate_at - state.ad_starts[-1] > 30:
                     state.ad_starts.append(state.ad_candidate_at)
@@ -379,6 +381,8 @@ class Detector:
 
 
 class Handler(BaseHTTPRequestHandler):
+    latest_frame_lock = threading.Lock()
+    latest_frame = None
     detector = Detector()
     token = os.getenv("FRAME_TOKEN", "")
     realtime_enabled = os.getenv("ENABLE_REALTIME", "0") == "1"
@@ -418,6 +422,24 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(401, "unauthorized")
             else:
                 self._reply(200, json.dumps(self.fast().status()), "application/json")
+        elif self.path == "/v1/latest-frame":
+            if not self._authorized():
+                self._reply(401, "unauthorized")
+                return
+            with self.latest_frame_lock:
+                frame = type(self).latest_frame
+            if frame is None:
+                self._reply(404, "No frame received yet")
+                return
+            png, received, sequence = frame
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(png)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Frame-Received-Unix", str(received))
+            self.send_header("X-TV-Frame-Sequence", sequence)
+            self.end_headers()
+            self.wfile.write(png)
         elif self.path == "/v1/status":
             if not self._authorized():
                 self._reply(401, "unauthorized")
@@ -427,6 +449,23 @@ class Handler(BaseHTTPRequestHandler):
             self._reply(404, "not found")
 
     def do_POST(self):
+        if self.path == "/v1/native-event":
+            if not self._authorized():
+                self._reply(401, "unauthorized")
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if not 2 <= size <= 4096:
+                    raise ValueError()
+                data = json.loads(self.rfile.read(size))
+                if not isinstance(data, dict) or not isinstance(data.get("tv_id"), str):
+                    raise ValueError()
+                accepted = self.detector.observe_native(data)
+            except (ValueError, TypeError):
+                self._reply(400, "invalid event")
+                return
+            self._reply(200 if accepted else 409, "accepted" if accepted else "stale or unbound")
+            return
         if self.path != "/v1/frame" and not (self.realtime_enabled and self.path in {"/v2/frame", "/v2/audio"}):
             self._reply(404, "not found")
             return
@@ -453,6 +492,11 @@ class Handler(BaseHTTPRequestHandler):
             "frame_sequence": self.headers.get("X-TV-Frame-Sequence", "")[:24],
         }
         tv_id = self.headers.get("X-TV-ID", "frame-tv")[:80]
+        if self.path in ("/v1/frame", "/v2/frame") and tv_id == "frame-tv":
+            # One in-memory arrival snapshot; never changes the detector decision.
+            with self.latest_frame_lock:
+                type(self).latest_frame = (png, time.time(),
+                    context['frame_sequence'] if context['frame_sequence'].isdigit() else '')
         if self.path == "/v2/audio":
             try:
                 capture_start = float(self.headers.get("X-Capture-Start-Unix", ""))

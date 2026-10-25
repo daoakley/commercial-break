@@ -1,0 +1,13 @@
+{
+  "CaptureProgram.cs": "46d316c5ff7fd5015635aeb2734cf0866ec07099dd9a8d3b4cee9889dd6e41d7",
+  "Dockerfile": "c9d3f836275020aae98e3c9635b609bd1f2e0de99c40f9615bb7cf194c06f2cf",
+  "README.md": "d20d2e504fb862065f0afd3420e574a9325e8121725cff810beeae4070bbcf39",
+  "cover_mask.json": "23be051721f29d85c825485af7b73e843e33c6ee408bc9587073c6bf85e94bfb",
+  "local_signals.py": "c7be8855dd15f8a040ce34de4bb83b5a0f9fccc8e0b593c98d7468b62a2c95fb",
+  "playback_identity.py": "010f93468a9ee0ef4a4fa103e3af86cb5fe59e1012206cc9d14d62e236c2050d",
+  "realtime.py": "6b7ca60833e2f0f858a7a034d182e917cb39029d06223499f2562731eba63463",
+  "server.py": "fe955a6d4e86cb88969f099b1db1503a6aa3703f0e159f1674f5317b0a484f3f",
+  "sponsored_badge.py": "146aab436259726ddd5c911c1a7f649bfde54bbd9ff31ecfde903a49bb7dbeaf",
+  "sponsored_template.json": "7c774e11abddb704234b512b746e4e48655517078ed1b6217e2ecd6fbcbcb983",
+  "viewing_context.py": "6e8548953c3df111bb3e0acf58c69c48346787c88ac4c00f431fbf626c16445a"
+}

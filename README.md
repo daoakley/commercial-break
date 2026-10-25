@@ -1,5 +1,7 @@
 # Commercial Break
 
+**Handoff status (24 October 2026):** ad-onset delay remains unresolved. The development source differs from the live detector, and the earlier fast-display trial remains suspended. Start with [current status](docs/PROJECT_STATUS.md), [architecture](docs/ARCHITECTURE.md), [operations/dashboard](docs/OPERATIONS.md), [research](docs/RESEARCH.md), and [Claude handoff](docs/CLAUDE_HANDOFF.md). The verified deployed detector source is preserved under [reference](reference/deployed-2026-10-24/). PR #5 is a draft; this is not a validated release.
+
 Commercial Break is an experimental commercial muter for a Samsung Frame TV. A temporary TV-side helper captures a 480×270 screenshot of the active display and sends it to a detector on your computer. The detector asks a Claude Code vision bridge whether the frame shows a commercial. On a confirmed ad, the TV helper mutes the speakers, lowers the active backlight, and displays an opaque “Commercial Break” card. Playback continues underneath. It restores sound and brightness when program content returns.
 
 For YouTube TV, the detector first checks the app's fixed upper-left **Sponsored** pill locally. A strong match mutes on that frame without waiting for Claude; frames without the pill follow the normal vision path. This template is specific to 480×270 captures from the tested YouTube TV app. In 1,589 saved frames from the owner's TV, it matched 68: 66 classified ads and two frames initially classified as program that visibly showed the pill over a political ad. Badge detection cannot shorten the wait until the TV takes its next screenshot.
@@ -85,7 +87,7 @@ STAGE=/home/owner/share/tmp/sdk_tools
 "$TVROOT" --sdb "$SDB" archive-root root "$TV_IP" --command 'id'
 ```
 
-On the tested TV, the original library is `/usr/lib/libtzcapturec.so`. Copy it to the developer-writable staging area using the authenticated temporary root route, pull it to a **Git-ignored** local `private/` directory, and remove the staging copy:
+On the tested TV, the original library is `/usr/lib/libtzcapturec.so`. Copy it to the developer-writable staging area using the authenticated temporary root route, transfer it to a **Git-ignored** local `private/` directory, and remove the staging copy. The generic example below uses `sdb pull`; this failed on the owner's retail set. Their working fallback was a bounded read through the established root command path. Do not treat a failed pull as failed root, and never print a library or token into a public transcript:
 
 ```sh
 mkdir -p private
@@ -140,6 +142,8 @@ The default `tv.env.example` limits the first TV run to 15 minutes. If the agent
 
 ## Decision and fail-safe behavior
 
+The following policy describes the deployed reference. Root development source has pending differences listed in [current status](docs/PROJECT_STATUS.md); its shorter idle delay has not been live-validated.
+
 The detector tracks recent program and ad observations in memory. A matched YouTube TV Sponsored pill mutes on one frame. Without the pill, a model-labeled ad at confidence 0.85 or higher can mute on one frame when a program is established, including after uncertain cutaway frames; otherwise it waits for two distinct ad frames. The prompt requires promotional evidence in the current frame: a change from the previously known show is not itself an ad. It does not use a generic banner detector. Uncertain frames request another capture after 2 seconds. During a confirmed break it waits 8 seconds after each response before another screenshot. Two moderate-confidence frames identifying a coherent new program release the cover and reset the learned break cadence; one strong new-program frame can release it while muted. The return may therefore remain covered for several seconds, plus model processing time. Break timing can increase screenshot frequency before an ad but never orders a mute on its own. The TV helper reads Tizen's current foreground app ID for each frame, failing open if that read is unavailable. A changed channel/title also resets the detector when supplied, but this project has not found a reliable live YouTube TV channel/title feed on this Frame. A native Media Controller client returned `-38` when created in a temporary root shell, so that probe supplied no now-playing data.
 
 An observed program counts as established even if the model cannot give it a title. The detector logs the ad/program label, confidence, program-change flag, and classification time, without logging the screenshot or viewing description. These fields help separate a slow model response from a policy decision when coverage is late.
@@ -158,7 +162,7 @@ Active backlight at 0/50 was tested first but left the image clearly visible, so
 
 By default, the TV deletes each PNG after submission, the host bridge removes its temporary PNG after classification, and the detector keeps only short in-memory context. Optional audit capture in `claude_bridge.py` is disabled unless you set `TV_AUDIT_DIR`. Screenshots and viewing context **are sent to Claude**. Commercial Break does not block Samsung's ACR or other tracking. Do not put `private/`, `.env`, `tv.env`, captured images/audio, or any copied Samsung library in a public commit.
 
-The repository contains only the core commercial-break source, tests, and examples. It intentionally excludes personal recordings, proprietary TV binaries, and the separate experimental audio study. The audio study is not part of the live mute decision.
+The repository contains core source, tests, the portable local dashboard, deployed-reference source, and observation-only audio research tools. It excludes personal recordings, credentials and proprietary TV binaries. Audio is not part of the live mute decision.
 
 Run the included policy and bridge tests with:
 

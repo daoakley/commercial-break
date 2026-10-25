@@ -1,3 +1,5 @@
+> Current deployment and later findings: [Project status](PROJECT_STATUS.md). Fast/persistent/warm modes remain suspended. This design includes experiments, not a claim that all paths are active.
+
 # Context and fast detection — 24 October 2026
 
 **Current live path: sequential capture, experimental fast path disabled.**

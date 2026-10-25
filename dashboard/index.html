@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Commercial Break · Dashboard</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<body><main>
+<header><span class="eyebrow">COMMERCIAL BREAK</span><span id="connection">Connecting…</span></header>
+<section class="live-panel" aria-label="Current viewing"><div class="live-top"><span class="eyebrow">WATCHING NOW</span><span id="live-state">Connecting to TV…</span></div><h2 id="live-title">Identifying the current show</h2><p id="live-source">Live context is separate from your saved study.</p><div class="live-meta"><span id="live-observed">First observation —</span><span id="live-native">Native ad starts —</span></div></section>
+<section class="screen-panel" aria-label="TV screenshot">
+<div class="panel-heading"><div><span class="eyebrow">CURRENT SCREEN</span><h2>A window into your TV</h2></div><div class="capture-actions"><button id="latest-frame" class="capture-button">Show latest frame</button><button id="capture" class="capture-secondary">Capture displayed screen</button></div></div>
+<div class="screen-caption"><span id="capture-status" role="status" aria-live="polite">Existing feed · no extra capture or AI call</span><a id="screen-open" href="/screen.png" target="_blank" rel="noopener" hidden>Open full image ↗</a></div><div class="screen-stage"><p id="screen-placeholder">Click Show latest frame to view the existing TV feed.</p><img id="screen-image" alt="Latest requested TV screenshot" hidden></div>
+
+<p class="small-note">Latest frame reuses the detector’s incoming image and may show content beneath the cover. Capture displayed screen requests a separate screenshot including the cover card (up to 30 seconds). Neither button changes playback or controls.</p>
+</section>
+<aside class="data-panel" aria-label="Live TV and app data"><span class="eyebrow">TV &amp; APP DATA</span><h2>What the system knows</h2><p id="data-freshness" class="small-note">Waiting for the detector…</p><section class="native-panel"><div class="native-heading"><strong>YouTube live metadata</strong><span id="native-state">Connecting…</span></div><dl id="native-details" class="data-grid"></dl><p class="small-note">Playback timing comes from YouTube, not a TV guide. Native ad events cover inserted segments; their absence does not mean the show has resumed.</p></section><details class="inference-details" open><summary>Visual context and learned timing</summary><dl id="live-details" class="data-grid"></dl></details><details><summary>TV readings from last screenshot request</summary><p id="tv-read-time" class="small-note">Capture a screen to read TV state.</p><dl id="tv-details" class="data-grid"></dl></details><p class="small-note">“Likely” titles come from visual inference. Unknown channel names and broadcast start times are not guessed.</p></aside>
+<section class="study-panel"><h1>Measure a break</h1>
+<p class="intro">Watch for the next break. Mark the moment an ad begins and the moment the show returns. Need longer? Add time while you watch.</p>
+<section class="clock"><div><span id="phase">Ready when you are</span><strong id="timer">15:00</strong></div><span id="current">No window running</span></section>
+<noscript><p>Open the <a href="http://127.0.0.1:8792/">live study</a> with JavaScript enabled to record observations.</p></noscript>
+<div id="setup"><div class="identity-fields"><div><label for="source">Source</label><input id="source" maxlength="80" value="YouTube TV"></div><div><label for="channel">Channel</label><input id="channel" maxlength="100" placeholder="e.g. ACC Network"></div></div>
+<label for="show">Current show</label><input id="show" maxlength="180" placeholder="e.g. UNC vs Syracuse · football">
+<label class="check"><input type="checkbox" id="new_show"> Start a new show profile</label>
+<details><summary>Optional start time and notes</summary><label for="show_start">Show start time <span>(only if known)</span></label><input id="show_start" type="datetime-local"><label for="context">Notes</label><input id="context" maxlength="180" placeholder="Notes for this observation window"></details>
+<label for="initial">What is on screen now?</label><select id="initial"><option value="program">The show / game</option><option value="ad">A commercial break</option><option value="uncertain">I’m not sure</option></select>
+<label for="duration">How long can you watch closely?</label><select id="duration"><option value="300">5 minutes</option><option value="900" selected>15 minutes</option><option value="1800">30 minutes</option></select>
+<button id="start" class="start">Start observation window</button></div>
+<div class="markers"><button id="ad" class="ad" disabled><span>Ad starts</span><kbd>A</kbd></button><button id="program" class="program" disabled><span>Program resumes</span><kbd>P</kbd></button></div>
+<div class="secondary"><button id="extend" disabled>Add 5 minutes</button><button id="uncertain" disabled>Unsure / missed it</button><button id="channel_changed" disabled>Channel changed</button><button id="undo" disabled>Undo last</button><button id="end" disabled>End window</button></div>
+<p id="feedback" role="status" aria-live="polite">No TV controls. These buttons only record your observations.</p>
+<details><summary>What counts?</summary><p>Mark a commercial or promotional break that replaces the show. A sponsor logo, scoreboard, or banner over ongoing game action is still the program. Use Unsure if you look away or miss a transition; mark Program resumes or Ad starts when you can confirm the screen again.</p><p>Keyboard: A = ad, P = program. Click as soon as you notice the transition. Your reaction time is part of the measurement; we will compare clicks with nearby frames, not treat them as frame-perfect truth.</p></details>
+</section><aside class="history-panel"><section class="insight" aria-label="Channel viewing timeline">
+<div class="insight-head"><span class="eyebrow">SAVED STUDY TIMELINE</span><span id="chart-source">Your observations</span></div>
+<h2 id="show-name">Waiting for your first window</h2><p id="show-context">Channel and show context builds here as you watch.</p>
+<div class="metrics"><div><span>Show started</span><strong id="show-start">Not confirmed</strong></div><div><span>Typical break gap</span><strong id="break-gap">Learning</strong></div><div><span>Ad time observed</span><strong id="ad-time">—</strong></div></div>
+<div class="chart-legend"><span class="legend-program">Program</span><span class="legend-ad">Commercial</span><span class="legend-unknown">Uncertain</span><span class="legend-cover">TV cover active</span></div>
+<svg id="timeline" viewBox="0 0 580 168" role="img" aria-label="Time on the horizontal axis; content and TV cover on separate rows"></svg>
+<p id="timeline-note">The chart uses real observations only. Unknown time stays blank.</p>
+</section>
+<div class="log-heading"><h2>This window</h2><span>Saved on this computer</span></div><ol id="events"><li>No observations yet.</li></ol>
+</aside></main></body></html>

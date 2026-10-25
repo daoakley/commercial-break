@@ -105,6 +105,9 @@ internal static class CommercialOverlayProbe
     private static extern IntPtr evas_object_text_add(IntPtr evas);
 
     [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void evas_object_geometry_get(IntPtr obj, out int x, out int y, out int w, out int h);
+
+    [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr evas_object_textblock_add(IntPtr evas);
 
     [DllImport("libevas.so.1", CallingConvention = CallingConvention.Cdecl)]
@@ -620,6 +623,7 @@ internal static class CommercialOverlayProbe
         private readonly Dictionary<string, IntPtr> infoText = new Dictionary<string, IntPtr>();
         private readonly List<IntPtr> timelineBars = new List<IntPtr>();
         private bool infoBuilt;
+        private readonly Dictionary<string, int[]> textBoxes = new Dictionary<string, int[]>();
 
         internal void HideInfo()
         {
@@ -640,6 +644,10 @@ internal static class CommercialOverlayProbe
             evas_object_text_text_set(obj, value);
             evas_object_move(obj, x, y); ApplyColor(obj, color); Show(obj);
             infoObjects.Add(obj); infoText[key] = obj;
+            int width = key == "title" || key == "subtitle" || key == "fact" ? 1320 :
+                key.StartsWith("elapsed") || key.StartsWith("count") || key.StartsWith("typical") ? 440 : 0;
+            textBoxes[key] = new[] {x, y, size, width};
+            SetInfoText(key, value, 160);
         }
 
         private void SetInfoText(string key, string value, int limit = 80)
@@ -647,7 +655,21 @@ internal static class CommercialOverlayProbe
             // Plain Evas text: untrusted metadata cannot introduce markup.
             value = (value ?? "").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
             if (value.Length > limit) value = value.Substring(0, limit - 1) + "…";
-            evas_object_text_text_set(infoText[key], value);
+            IntPtr obj = infoText[key];
+            evas_object_text_text_set(obj, value);
+            int[] box = textBoxes[key];
+            if (box[3] > 0)
+            {
+                int size = box[2], width, height, x, y;
+                do
+                {
+                    evas_object_text_font_set(obj, "SamsungOne", size);
+                    evas_object_geometry_get(obj, out x, out y, out width, out height);
+                    if (width <= box[3] - 32 || size <= 18) break;
+                    size--;
+                } while (true);
+                evas_object_move(obj, box[0] + Math.Max(16, (box[3] - width) / 2), box[1]);
+            }
         }
 
         private static string InfoString(JsonElement root, string key)
@@ -680,26 +702,26 @@ internal static class CommercialOverlayProbe
             Rgba amber = new Rgba(203, 161, 99, 255);
             if (!infoBuilt)
             {
-                InfoText("title", 300, 300, 36, "", white);
-                InfoText("subtitle", 300, 354, 24, "", muted);
-                InfoText("elapsedLabel", 300, 654, 19, "SINCE BREAK DETECTED", muted);
+                InfoText("title", 300, 310, 40, "", white);
+                InfoText("subtitle", 300, 368, 26, "", muted);
+                InfoText("elapsedLabel", 300, 654, 22, "SINCE BREAK DETECTED", muted);
                 InfoText("elapsed", 300, 692, 42, "", white);
-                InfoText("countLabel", 810, 654, 19, "RECENT BREAKS COVERED", muted);
-                InfoText("count", 810, 692, 42, "", white);
-                InfoText("typicalLabel", 1320, 654, 19, "TYPICAL BREAK", muted);
-                InfoText("typical", 1320, 692, 42, "", white);
-                InfoText("history", 300, 782, 19, "", muted);
+                InfoText("countLabel", 740, 654, 22, "BREAKS COVERED", muted);
+                InfoText("count", 740, 692, 42, "", white);
+                InfoText("typicalLabel", 1180, 654, 22, "TYPICAL BREAK", muted);
+                InfoText("typical", 1180, 692, 42, "", white);
+                InfoText("history", 300, 788, 21, "", muted);
                 InfoRectangle(300, 825, 1320, 12, new Rgba(38, 48, 59, 255));
                 for (int i = 0; i < 80; i++) timelineBars.Add(InfoRectangle(300, 825, 1, 12, green));
                 InfoRectangle(300, 879, 12, 12, blue);
                 InfoText("programLegend", 325, 872, 20, "Program", muted);
-                InfoRectangle(510, 879, 12, 12, amber);
-                InfoText("adLegend", 535, 872, 20, "Ad observed", muted);
-                InfoRectangle(790, 879, 12, 12, green);
-                InfoText("coverLegend", 815, 872, 20, "Cover requested", muted);
-                InfoRectangle(1120, 879, 12, 12, new Rgba(70, 80, 90, 255));
-                InfoText("unknownLegend", 1145, 872, 20, "Unknown / unsampled", muted);
-                InfoText("fact", 300, 952, 22, "", muted);
+                InfoRectangle(630, 879, 12, 12, amber);
+                InfoText("adLegend", 655, 872, 20, "Ad observed", muted);
+                InfoRectangle(960, 879, 12, 12, green);
+                InfoText("coverLegend", 985, 872, 20, "Cover requested", muted);
+                InfoRectangle(1290, 879, 12, 12, new Rgba(70, 80, 90, 255));
+                InfoText("unknownLegend", 1315, 872, 20, "Unknown", muted);
+                InfoText("fact", 300, 938, 24, "", muted);
                 infoBuilt = true;
             }
             foreach (IntPtr obj in infoObjects) Show(obj);

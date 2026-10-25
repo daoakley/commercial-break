@@ -1,3 +1,7 @@
+# Superseded handoff
+
+Read [Claude handoff](CLAUDE_HANDOFF.md) and [current status](PROJECT_STATUS.md) first. The text below is a historical snapshot and is not the current deployment manifest.
+
 # Commercial Break handoff — 24 October 2026
 
 ## Current live configuration — sequential path active
