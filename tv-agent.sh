@@ -55,9 +55,8 @@ get_mute() {
 }
 
 current_app_id() {
-  # Read Tizen's foreground-app key for each frame. The configured ID is only
-  # a fallback if this key is unavailable; app switches otherwise reset the
-  # detector's context instead of masquerading as YouTube TV.
+  # Read the actual foreground app. An unavailable identity fails open rather
+  # than substituting the configured app and inheriting its old ad state.
   /usr/bin/vconftool get memory/appfw/current_fullscreen_appid 2>/dev/null |
     sed -n 's/^[^,]*, value = \([A-Za-z0-9._-]*\) (String)$/\1/p' |
     head -n 1
@@ -130,6 +129,12 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   date +%s > "$HEARTBEAT"
   cycle_started=$(uptime_now)
   captured_navigation=$(navigation_generation)
+  observed_app=$(current_app_id)
+  if [ -z "$observed_app" ]; then
+    overlay_release; release_owned_mute; release_owned_backlight || true
+    sleep 1
+    continue
+  fi
   capture_pause=
   capture_ack=
   if [ -f "$OVERLAY_LEASE" ] && overlay_running; then
@@ -166,14 +171,22 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   captured_at=$(uptime_now)
   request_timeout=38
   if [ "$FAST_MODE" = 1 ]; then request_timeout=3; fi
-  observed_app=$(current_app_id)
-  if [ -z "$observed_app" ]; then observed_app=$TV_APP; fi
+  # Bind the frame to the foreground app before capture, not after it.
+  # A transition during capture must not label the old picture as the new app.
+  if [ "$(current_app_id)" != "$observed_app" ] ||
+     [ "$(navigation_generation)" != "$captured_navigation" ]; then
+    overlay_release; release_owned_mute; release_owned_backlight || true
+    rm -f "$CAPTURE_FILE"
+    sleep 1
+    continue
+  fi
   action=$(curl -fsS --connect-timeout 2 --max-time "$request_timeout" -D "$RESPONSE_HEADERS" -X POST \
     -H "Expect:" \
     -H "Authorization: Bearer $FRAME_TOKEN" \
     -H "Content-Type: image/png" \
     -H "X-TV-ID: $TV_ID" \
     -H "X-TV-Session: $TV_SESSION-$captured_navigation" \
+    -H "X-TV-Frame-Sequence: $((count + 1))" \
     -H "X-TV-App: $observed_app" \
     -H "X-TV-Channel: $TV_CHANNEL" \
     -H "X-TV-Title: $TV_TITLE" \
@@ -192,7 +205,8 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
   current_navigation=$(navigation_generation)
   # A remote action invalidates even a conclusive answer to an older frame.
   # Leave a short grace period for the app's guide/channel transition.
-  if [ "$current_navigation" != "$captured_navigation" ] ||
+  if [ "$(current_app_id)" != "$observed_app" ] ||
+     [ "$current_navigation" != "$captured_navigation" ] ||
      { [ "$current_navigation" -gt 0 ] && [ $(( $(date +%s) - current_navigation / 1000 )) -lt 3 ]; }; then
     action=UNMUTE
     next_interval=1
@@ -238,6 +252,14 @@ while [ "$MAX_FRAMES" -eq 0 ] || [ "$count" -lt "$MAX_FRAMES" ]; do
       release_owned_backlight || true
       ;;
   esac
+  # Navigation can race slow mute/backlight operations, too. Recheck after
+  # actuation and release only controls this helper owns if identity changed.
+  if [ "$(navigation_generation)" != "$captured_navigation" ] ||
+     [ "$(current_app_id)" != "$observed_app" ]; then
+    overlay_release; release_owned_mute; release_owned_backlight || true
+    action=UNMUTE
+    next_interval=1
+  fi
   cycle_finished=$(uptime_now)
   timings=$(awk -v a="$cycle_started" -v b="$captured_at" -v c="$response_at" -v d="$cycle_finished" 'BEGIN {printf "capture_ms=%.0f request_ms=%.0f actuation_ms=%.0f", (b-a)*1000,(c-b)*1000,(d-c)*1000}')
   echo "$(date '+%H:%M:%S') decision=$action${observed_action:+ observed=$observed_action} $timings"

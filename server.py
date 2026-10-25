@@ -1,6 +1,7 @@
 """Small, stateless-on-disk vision classifier and conservative mute policy."""
 
 import base64
+import copy
 import hashlib
 import hmac
 import json
@@ -10,13 +11,14 @@ import statistics
 import threading
 import time
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import sponsored_badge
 from local_signals import visual_features, own_card
 import zlib
 from viewing_context import ViewingContext, CATEGORIES, PRESENTATIONS
+from playback_identity import PlaybackIdentity
 
 MAX_FRAME_BYTES = 1_000_000
 MIN_CONFIDENCE = 0.70
@@ -111,11 +113,27 @@ class Detector:
         self.vision = vision or VisionClient()
         self.clock = clock or time.time
         self.states = {}
+        self.identities = {}
         self.states_lock = threading.Lock()
 
     def state(self, tv_id):
         with self.states_lock:
             return self.states.setdefault(tv_id, TVState())
+
+    @staticmethod
+    def replace_state(target, replacement):
+        with target.lock:
+            for f in fields(TVState):
+                if f.name != 'lock':
+                    setattr(target, f.name, getattr(replacement, f.name))
+
+    def status(self):
+        with self.states_lock:
+            return [dict(tv_id=tv_id, identity=identity.snapshot(),
+                         muted_by_detector=self.states[tv_id].muted_by_detector,
+                         viewing_context=self.states[tv_id].viewing.snapshot(self.clock(),
+                             dict(channel=identity.channel, title=identity.title)))
+                    for tv_id, identity in self.identities.items() if tv_id in self.states]
 
     def next_interval(self, tv_id):
         state = self.state(tv_id)
@@ -148,14 +166,36 @@ class Detector:
 
     def process(self, tv_id, png, context):
         at = self.clock()
-        action, verdict = self._process(tv_id, png, context)
-        state = self.state(tv_id)
-        with state.lock:
-            state.viewing.observe(verdict, at, action == "MUTE", is_error=state.model_unavailable)
-        return action, verdict
+        with self.states_lock:
+            identity = self.identities.setdefault(tv_id, PlaybackIdentity())
+            accepted, reason = identity.admit(context, at)
+            if not accepted:
+                return "UNMUTE", Verdict("uncertain", evidence=reason)
+            state = self.states.setdefault(tv_id, TVState())
+            if reason:
+                # Replace the active state without waiting for an old AI call.
+                # That call holds only a private working copy and cannot revive it.
+                fresh = TVState(app=identity.app, session=identity.session,
+                                channel=identity.channel, title=identity.title)
+                fresh.viewing.epoch = state.viewing.epoch + 1
+                self.replace_state(state, fresh)
+                return "UNMUTE", Verdict("uncertain", evidence=reason)
+            if not identity.app:
+                return "UNMUTE", Verdict("uncertain", evidence="foreground app unavailable")
+            ticket = identity.ticket
+            working = TVState(**{f.name: copy.deepcopy(getattr(state, f.name))
+                                 for f in fields(TVState) if f.name != 'lock'})
+            enriched = dict(context, playback_identity=identity.snapshot())
+        action, verdict = self._process(tv_id, png, enriched, working)
+        working.viewing.observe(verdict, at, action == "MUTE", is_error=working.model_unavailable)
+        with self.states_lock:
+            if identity.ticket != ticket:
+                return "UNMUTE", Verdict("uncertain", evidence="obsolete playback result")
+            self.replace_state(state, working)
+            return action, verdict
 
-    def _process(self, tv_id, png, context):
-        state = self.state(tv_id)
+    def _process(self, tv_id, png, context, state=None):
+        state = state if state is not None else self.state(tv_id)
         now = self.clock()
         with state.lock:
             app = context.get("app", "")
@@ -369,6 +409,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(401, "unauthorized")
             else:
                 self._reply(200, json.dumps(self.fast().status()), "application/json")
+        elif self.path == "/v1/status":
+            if not self._authorized():
+                self._reply(401, "unauthorized")
+            else:
+                self._reply(200, json.dumps(self.detector.status()), "application/json")
         else:
             self._reply(404, "not found")
 
@@ -396,6 +441,7 @@ class Handler(BaseHTTPRequestHandler):
             "title": self.headers.get("X-TV-Title", "")[:180],
             "local_time": self.headers.get("X-TV-Local-Time", "")[:80],
             "session": self.headers.get("X-TV-Session", "")[:80],
+            "frame_sequence": self.headers.get("X-TV-Frame-Sequence", "")[:24],
         }
         tv_id = self.headers.get("X-TV-ID", "frame-tv")[:80]
         if self.path == "/v2/audio":
