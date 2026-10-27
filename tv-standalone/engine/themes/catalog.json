@@ -88,5 +88,53 @@
     "name": "Mist & mountains",
     "category": "Zen",
     "description": "Layered green ridgelines fading into mist."
+  },
+  {
+    "id": "raleigh-day",
+    "name": "Raleigh \u00b7 Day",
+    "category": "City skylines",
+    "description": "PNC\u2019s spire, the stepped Wells Fargo tower and Raleigh\u2019s downtown roofline."
+  },
+  {
+    "id": "raleigh-night",
+    "name": "Raleigh \u00b7 Night",
+    "category": "City skylines",
+    "description": "PNC\u2019s spire, the stepped Wells Fargo tower and Raleigh\u2019s downtown roofline."
+  },
+  {
+    "id": "memphis-day",
+    "name": "Memphis \u00b7 Day",
+    "category": "City skylines",
+    "description": "The Pyramid, Hernando de Soto Bridge and the Mississippi riverfront."
+  },
+  {
+    "id": "memphis-night",
+    "name": "Memphis \u00b7 Night",
+    "category": "City skylines",
+    "description": "The Pyramid, Hernando de Soto Bridge and the Mississippi riverfront."
+  },
+  {
+    "id": "dc-day",
+    "name": "Washington, DC \u00b7 Day",
+    "category": "City skylines",
+    "description": "The Capitol dome, Washington Monument and Lincoln Memorial."
+  },
+  {
+    "id": "dc-night",
+    "name": "Washington, DC \u00b7 Night",
+    "category": "City skylines",
+    "description": "The Capitol dome, Washington Monument and Lincoln Memorial."
+  },
+  {
+    "id": "charlotte-day",
+    "name": "Charlotte \u00b7 Day",
+    "category": "City skylines",
+    "description": "The Corporate Center\u2019s crown, angular 550 South Tryon and Uptown towers."
+  },
+  {
+    "id": "charlotte-night",
+    "name": "Charlotte \u00b7 Night",
+    "category": "City skylines",
+    "description": "The Corporate Center\u2019s crown, angular 550 South Tryon and Uptown towers."
   }
 ]

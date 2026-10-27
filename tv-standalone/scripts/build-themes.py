@@ -26,7 +26,7 @@ def heart(x,y,r,c):
 def base(a,b):return [rect(0,0,1920,1080,a)]+gradient(a,b)
 def add(id,name,category,description,objects,accent='#C8C0AD'):
     objects += [rect(835,383,250,2,accent),text(404,'Commercial Break',102),text(560,'A MOMENT TO YOURSELF',22,accent,60)]
-    scene={'objects':objects}
+    scene={'infoMode':'clock','objects':objects}
     (OUT/(id+'.json')).write_text(json.dumps(scene,separators=(',',':'))+'\n')
     themes.append(dict(id=id,name=name,category=category,description=description,scene=scene))
 
@@ -107,6 +107,9 @@ o=base('#1B272A','#5B706D')+[ellipse(1480,170,145,145,'#C2C8B5')]
 for i,c in enumerate(['#738781','#657E76','#516D65','#38564F']):
     y=760+i*100;o.append(poly([(0,1080),(0,y+40),(300,y-90),(560,y+20),(970,y-140),(1360,y+60),(1680,y-80),(1920,y+10),(1920,1080)],c))
 add('zen-mountains','Mist & mountains','Zen','Layered green ridgelines fading into mist.',o)
+
+import runpy
+runpy.run_path(str(Path(__file__).with_name('skyline-art.py')))['city_scenes'](base,rect,ellipse,poly,line,add)
 
 catalog=[{k:v for k,v in t.items() if k!='scene'} for t in themes]
 (OUT/'catalog.json').write_text(json.dumps(catalog,indent=2)+'\n')
