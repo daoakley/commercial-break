@@ -1,0 +1,34 @@
+{
+  "objects": [
+    {
+      "type": "rectangle",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "color": "#05090FFF"
+    },
+    {
+      "type": "rectangle",
+      "x": 760,
+      "y": 372,
+      "width": 400,
+      "height": 3,
+      "color": "#9EBBAFFF"
+    },
+    {
+      "type": "textblock",
+      "x": 120,
+      "y": 392,
+      "width": 1680,
+      "height": 200,
+      "text": "Commercial Break",
+      "size": 168,
+      "font": "SamsungOne",
+      "color": "#F4F7F4FF",
+      "align": "center",
+      "valign": "center",
+      "style": "plain"
+    }
+  ]
+}

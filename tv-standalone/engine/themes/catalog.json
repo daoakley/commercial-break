@@ -1,0 +1,92 @@
+[
+  {
+    "id": "default",
+    "name": "Original",
+    "category": "Original",
+    "description": "Your current quiet, dark break screen."
+  },
+  {
+    "id": "spring",
+    "name": "Spring blossom",
+    "category": "Seasons",
+    "description": "Soft blossoms against an evening sky."
+  },
+  {
+    "id": "summer",
+    "name": "Summer shore",
+    "category": "Seasons",
+    "description": "A sunlit horizon and a quiet sea."
+  },
+  {
+    "id": "autumn",
+    "name": "Autumn amber",
+    "category": "Seasons",
+    "description": "Copper leaves and warm layered hills."
+  },
+  {
+    "id": "winter",
+    "name": "Winter stillness",
+    "category": "Seasons",
+    "description": "Snow-covered peaks under a pale moon."
+  },
+  {
+    "id": "christmas",
+    "name": "Christmas woodland",
+    "category": "US holidays",
+    "description": "Evergreen silhouettes and quiet golden stars."
+  },
+  {
+    "id": "valentines",
+    "name": "Valentine\u2019s Day",
+    "category": "US holidays",
+    "description": "A restrained composition in rose and plum."
+  },
+  {
+    "id": "new-year",
+    "name": "New Year",
+    "category": "US holidays",
+    "description": "Still golden starbursts in a midnight sky."
+  },
+  {
+    "id": "independence",
+    "name": "Independence Day",
+    "category": "US holidays",
+    "description": "Muted red, white and blue with an open starry sky."
+  },
+  {
+    "id": "halloween",
+    "name": "Halloween moon",
+    "category": "US holidays",
+    "description": "A crescent moon above a dusky landscape."
+  },
+  {
+    "id": "thanksgiving",
+    "name": "Thanksgiving harvest",
+    "category": "US holidays",
+    "description": "Golden wheat and an earthy evening palette."
+  },
+  {
+    "id": "easter",
+    "name": "Easter morning",
+    "category": "US holidays",
+    "description": "Pastel accents in a soft, green meadow."
+  },
+  {
+    "id": "zen-dunes",
+    "name": "Desert quiet",
+    "category": "Zen",
+    "description": "Soft dunes, gentle contours and warm light."
+  },
+  {
+    "id": "zen-water",
+    "name": "Quiet water",
+    "category": "Zen",
+    "description": "A calm horizon, moonlight and broad ripples."
+  },
+  {
+    "id": "zen-mountains",
+    "name": "Mist & mountains",
+    "category": "Zen",
+    "description": "Layered green ridgelines fading into mist."
+  }
+]
