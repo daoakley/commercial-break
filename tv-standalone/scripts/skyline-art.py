@@ -30,26 +30,37 @@ def city_scenes(base,rect,ellipse,poly,line,add):
         def lowrise(items,c=back):
           for x,w,h in items:block(x,990-h,w,h,c)
         if city=='raleigh':
-          # Southern composition: horizontal office mass, terraced tower, PNC spire.
-          lowrise([(0,110,55),(98,115,80),(205,90,125),(295,118,95),(438,100,80),(590,115,115),(710,88,85),(900,110,110),(1190,110,100),(1290,180,85),(1490,94,120),(1600,95,70),(1730,190,45)])
-          # Two Hanover Square: squared top and narrow vertical ribs.
-          block(330,770,115,230);block(342,759,91,12);windows(345,788,85,170,4,5)
-          # Progress plaza's long, flat roofline.
-          block(485,805,180,195);shape([(485,805),(510,795),(665,795),(665,1000),(485,1000)]);block(505,813,145,6,side)
-          windows(508,837,131,130,4,5)
-          # Wells Fargo / 150 Fayetteville: broad paired setbacks at the crown.
-          shape([(735,1000),(735,779),(745,779),(745,753),(756,753),(756,731),(770,731),(770,709),(786,709),(786,694),(807,694),(807,710),(824,710),(824,694),(843,694),(843,710),(858,710),(858,731),(871,731),(871,753),(882,753),(882,779),(891,779),(891,1000)])
-          block(813,775,25,225,side);windows(760,792,108,170,4,7)
-          # PNC: offset tall shaft and open triangular crown, thin central mast.
-          block(1040,744,146,256);block(1139,713,70,287);block(1131,704,86,10)
-          shape([(1141,704),(1174,645),(1206,704)]);shape([(1153,699),(1174,658),(1195,699)],back)
-          block(1172,615,3,34,front);block(1150,726,47,12,side);block(1138,744,7,256,side)
-          windows(1056,764,66,204,4,8);windows(1151,760,46,205,3,7)
-          # Marriott and the lower Fayetteville Street fabric.
-          block(1300,846,144,154);block(1313,837,118,9);windows(1320,865,98,100,4,4)
-          lowrise([(173,97,57),(475,81,41),(654,102,74),(904,104,62),(1214,85,50),(1460,110,80),(1660,170,60)],front)
-          # Raleigh's trees form the base, rather than an invented waterfront.
-          for x,y,w in [(0,990,230),(170,1006,280),(420,998,260),(660,1014,340),(980,1002,230),(1220,1008,270),(1450,989,300),(1730,1002,250)]:o.append(ellipse(x,y,w,110,ground))
+          # Original landmark composition, viewed from the north: Hanover left,
+          # PNC near the center and 150 Fayetteville right. Architectural profiles
+          # are simplified independently; this is not a trace of another print.
+          lowrise([(120,160,64),(275,125,110),(390,120,144),(635,120,165),(735,110,127),(1070,145,170),(1200,110,140),(1440,120,160),(1540,150,88),(1680,160,48)])
+          # Two Hanover Square: paired peaked roof towers, recessed center.
+          block(470,698,185,312,side)
+          block(470,709,62,301);block(593,709,62,301)
+          shape([(466,709),(501,662),(536,709)])
+          shape([(589,709),(624,662),(659,709)])
+          block(530,678,66,11);block(557,688,11,322,front)
+          windows(481,733,37,230,2,5);windows(604,733,37,230,2,5)
+          # PNC's crown sits over the narrow tall shaft, alongside a lower wing.
+          block(894,673,89,337);shape([(983,714),(1100,731),(1100,1010),(983,1010)],side)
+          block(887,665,104,12)
+          shape([(897,665),(938,595),(981,665)])
+          shape([(909,660),(938,610),(968,660)],back)
+          o.append(line(938,609,938,659,detail))
+          block(936,568,4,31);block(978,680,5,330,detail)
+          windows(907,700,56,235,3,6);windows(1004,755,72,191,3,5)
+          # 150 Fayetteville: angular, stepped crown and twin vertical shoulders.
+          shape([(1290,1010),(1290,728),(1303,728),(1303,705),(1317,705),(1317,682),(1331,682),(1331,659),(1350,659),(1350,636),(1373,636),(1373,654),(1392,654),(1392,676),(1410,676),(1410,699),(1426,699),(1426,724),(1441,724),(1441,1010)])
+          shape([(1350,660),(1373,660),(1373,715),(1392,715),(1392,787),(1410,787),(1410,1010),(1384,1010),(1384,812),(1367,812),(1367,741),(1350,741)],side)
+          windows(1309,752,37,205,2,6);windows(1406,754,22,202,2,5)
+          # Overlapping mid-rise masses create a continuous city rather than
+          # evenly spaced freestanding icons. Keep their details restrained.
+          block(700,878,129,132);block(716,863,98,15);windows(718,900,84,72,3,3)
+          block(811,914,80,96,side);block(1108,873,112,137);block(1121,859,86,14)
+          block(1211,927,90,83,side);block(1453,902,95,108)
+          lowrise([(270,135,50),(390,114,68),(640,81,66),(856,77,50),(1018,97,53),(1530,125,56)],front)
+          # Soft tree canopy, with smaller overlapping crowns than the old hills.
+          for x,y,w,h in [(0,1010,310,100),(245,994,190,100),(380,1016,220,90),(545,1012,210,95),(695,1024,230,90),(875,1012,210,100),(1030,1026,250,85),(1230,1012,235,100),(1420,998,200,110),(1580,1016,240,95),(1750,1026,200,85)]:o.append(ellipse(x,y,w,h,ground))
         elif city=='memphis':
           lowrise([(1010,85,100),(1110,85,160),(1235,70,122),(1350,90,90),(1490,90,130),(1620,75,100),(1720,130,65)],back)
           # North riverbank Pyramid, a distinctive low, wide profile.
