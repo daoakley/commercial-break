@@ -56,3 +56,7 @@ Do not add these classifications to blocking. The test demonstrates a small comp
 A same-sample diagnostic swept fixed SVM decision-margin cutoffs of 0,0.1,0.25,0.5,0.75 and 1.0. At 0.5, three extra ad frames remained and all three previously observed program false positives disappeared. Combined same-frame detections rose from 12 to 15 of 24 ad frames, a 25% relative increase (12.5 percentage points in sampled-frame recall). There were zero flags on 153 reviewed program frames at that cutoff. In the forward-only fold, the gain remained one ad frame.
 
 **This cutoff was selected after inspecting the same data, so this is development evidence, not independent validation.** An SVM margin of 0.5 is not a 50% probability. The candidate for a fresh-data test is now fixed at 0.5; it must be evaluated without further tuning on that new test set. The original deployment gate remains closed. This result does not demonstrate a 10% improvement in live blocking, cartoon safety, onset latency, or on-TV runtime feasibility. See `cutoff-results-2026-10-27.json` for every cutoff, including those that discarded all gains.
+
+## Explicitly authorized TV pilot
+
+On October 27 the owner requested a separately switchable live trial despite the evaluation limits above. See [the pilot implementation and off switch](../../tv-standalone/EXPERIMENTAL_LAYOUT.md) and `tv-pilot-results-2026-10-27.json`. The fixed forward model is experimental; this authorization does not convert exploratory scores into validated live performance.
