@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 entries = json.loads((root/'engine/themes/catalog.json').read_text())
-assert len(entries) == 23
+assert len(entries) == 25
 assert json.loads((root/'engine/themes/default.json').read_text()) == json.loads((root/'engine/scene.json').read_text())
 for t in entries:
     scene = json.loads((root/'engine/themes'/f"{t['id']}.json").read_text())
@@ -18,7 +18,7 @@ for t in entries:
         assert len(o['color']) == 9 and o['color'][0] == '#'
         if o['type'] == 'polygon': assert 3 <= len(o['points']) <= 128
     assert len(json.dumps(scene)) < 1024*1024
-print('23 offline scene catalogs validated; Original preserved.')
+print('25 offline scene catalogs validated; Original preserved.')
 
 # A modern browser silently accepted inset; the target TV did not.
 css = (root/'app/appearance.css').read_text()

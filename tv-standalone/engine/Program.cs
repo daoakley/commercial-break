@@ -53,7 +53,7 @@ class Program {
  }
  static bool OtherActive(){try{return Now()-long.Parse(File.ReadAllText("/run/codex-commercial-muter/heartbeat").Trim())*1000<60000;}catch{return false;}}
  static string App(){try {string s=Run("/usr/bin/vconftool","get memory/appfw/current_fullscreen_appid");var i=s.IndexOf("value = ");return i<0?"":s.Substring(i+8).Split(' ')[0];}catch{return "";}}
- static void Release(string reason="reset"){lock(Gate){if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;}}
+ static void Release(string reason="reset"){lock(Gate){if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;Themes?.EndBreak();}}
  static Process Spawn(string file,string args){return Process.Start(new ProcessStartInfo(file,args){UseShellExecute=false});}
  static Process SpawnScript(string script){var info=new ProcessStartInfo("/bin/sh"){UseShellExecute=false};info.ArgumentList.Add("-c");info.ArgumentList.Add(script);return Process.Start(info);}
  static void Prepare(){
@@ -70,7 +70,8 @@ class Program {
   if(!Overlay.HasExited){Overlay.Kill();if(!Overlay.WaitForExit(1500))throw new IOException("Previous theme renderer did not exit");}
   Overlay.Dispose();Overlay=null;
  }
- static void Cover(){lock(Gate){if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;RefreshIdleOverlay();if(!Covered){CoverSince=Now();Covers++;Record("cover","fresh ad match");
+ static void PrepareBreakArtwork(){if(!Covered)Themes.BeginBreak();RefreshIdleOverlay();}
+ static void Cover(){lock(Gate){if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;PrepareBreakArtwork();if(!Covered){CoverSince=Now();Covers++;Record("cover","fresh ad match");
   string mute=Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager GetSpeakerMute");
   if(mute.Trim()=="ii 0 0"){File.WriteAllText(State+"/owned-mute","1");Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b true");OwnMute=true;}
  }File.WriteAllText(State+"/overlay-lease",Now().ToString());

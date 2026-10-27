@@ -32,6 +32,16 @@ Open http://127.0.0.1:8797/preview.html. This page loads neither device credenti
 
 The browser UI is `app/appearance.js` and `app/appearance.css`. `preview.html` uses the same UI and generated scene data. Appearance is independent of enable/disable, recognition, debug retention, and mute ownership.
 
+### City rotation (prepared, not deployed)
+
+City skylines includes **Rotate cities · Day** and **Rotate cities · Night**. The sequence is Memphis → Washington, DC → Raleigh → Charlotte → repeat. **Preview next city** cycles only the local preview. Saving a rotation uses `cities-day` or `cities-night`; choosing an individual scene stops rotation.
+
+`ThemeSettings.BeginBreak()` chooses one valid city when the engine transitions from uncovered to covered, before checking whether its warm renderer needs replacement. Lease renewals and screenshot pauses retain that city. `EndBreak()` releases the selection when the engine releases its cover. These are detector-defined cover intervals, not verified broadcast ad-pod boundaries: if the detector releases and later reacquires within the same real ad pod, that counts as a new break for artwork rotation. No recognition timing or release rules are changed.
+
+`appearance.json` retains the next city index across engine restarts. Missing or corrupt city files are skipped; if none remain, the original scene is used. Failure to write the rotation cursor does not prevent covering an ad. Changes saved during a break take effect on the following break. Fixed themes retain their existing behavior.
+
+Deployment requires merging the two appearance lifecycle hooks and `ThemeSettings.cs` into the **current** TV engine source, plus the updated UI/catalog. Do not install this branch's older standalone engine over a newer engine with Sponsored-pill, layout or health improvements. The live TV currently has the Raleigh artwork asset update; rotation is not yet enabled there.
+
 ## Build and checks
 
 The TV engine targets its existing .NET Core 3.1 runtime. An appropriate .NET SDK and target references are needed locally; the settings test targets .NET 6.
