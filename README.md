@@ -172,3 +172,7 @@ python3 -m unittest discover -p 'test_*.py'
 ```
 
 This project builds on the independent [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root) project and Samsung's developer tools. Those dependencies are not bundled here.
+
+### Standalone TV appearance preview
+
+See [TV appearance themes](tv-standalone/README.md) for the isolated standalone controller source, seasonal/holiday/zen scenes, offline preview, and validation instructions. Installed on the development Frame TV; physical navigation and themed-overlay appearance still await viewer validation.
