@@ -35,3 +35,8 @@ work/
 *.HEIC
 *.jpg
 *.jpeg
+
+# Device provisioning and appearance preferences stay private.
+tv-standalone/app/device.js
+tv-standalone/**/appearance.json
+tv-standalone/**/device.json
