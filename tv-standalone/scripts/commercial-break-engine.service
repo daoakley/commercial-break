@@ -1,0 +1,19 @@
+[Unit]
+Description=Commercial Break supervised TV engine
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+UMask=0077
+WorkingDirectory=/opt/usr/home/owner/commercial-block
+ExecStartPre=-/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/release-owned.sh | /bin/sh'
+ExecStart=/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/engine-supervisor.sh | /bin/sh'
+ExecStopPost=/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/release-owned.sh | /bin/sh'
+Restart=always
+RestartSec=5
+TimeoutStopSec=8
+KillMode=control-group
+StandardOutput=null
+StandardError=null
+# Runtime unit: deliberately not enabled at boot. Temporary root is still required.

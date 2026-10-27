@@ -105,6 +105,13 @@ The controller manifest currently describes version 0.4.0. Internal names such
 as `CommercialBlock.dll` remain for installation compatibility; the visible app
 name is **Commercial Break**.
 
+## Crash recovery
+
+The on-TV engine now has [bounded private crash logs and a local recovery
+supervisor](RECOVERY.md). It restarts after process exits, stalled detection or
+repeated recognition failures while preserving your On/Off setting. Full reboot
+recovery still requires temporary privileged access.
+
 ## Runtime controls and maintenance
 
 The engine listens on `http://127.0.0.1:18764` on the TV and requires the private
