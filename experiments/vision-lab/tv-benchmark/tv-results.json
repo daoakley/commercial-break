@@ -1,0 +1,322 @@
+{
+  "device": {
+    "model": "QN65LS03BAFXZA",
+    "platform": "Samsung Pontus",
+    "kernel": "5.4.77",
+    "userspace": "ARMv7 softfp",
+    "logical_cpus": 4,
+    "neon": true,
+    "mem_total_kib": 1825688,
+    "initial_mem_available_kib": 277764,
+    "glibc": "2.30",
+    "dotnet": "3.1"
+  },
+  "model": {
+    "name": "MobileCLIP2-S0",
+    "image_parameters": 11357504,
+    "fp32_weight_bytes": 45420696,
+    "fp16_stored_weight_bytes": 22793624,
+    "inference_arithmetic": "FP32",
+    "text_encoder_exported": false
+  },
+  "runtime": {
+    "ncnn_commit": "9fc8106e6634a60f39945d63e5ed2dd0704ac9fc",
+    "compiler": "GCC 8.3.0 arm-linux-gnueabi",
+    "threads": 1,
+    "openmp": false,
+    "vulkan": false,
+    "custom_library_sha256": "387c4174a834ebbac29145f1d8a4506e2bdaf2caabc2523de251f698a629c25c"
+  },
+  "custom_runtime_test": {
+    "completed_inferences": 0,
+    "latency_ms": null,
+    "inference_peak_rss_kib": null,
+    "result": "native_library_mapping_rejected",
+    "loader_error": "failed to map segment from shared object",
+    "temporary_locations_tested": [
+      "data partition",
+      "tmpfs"
+    ],
+    "file_access_labels_tested": [
+      "User",
+      "System"
+    ],
+    "system_security_policy_changed": false
+  },
+  "stock_library_probe": [
+    {
+      "stage": "start",
+      "library": "/usr/lib/libncnn.so",
+      "deadline_seconds": 30,
+      "rss_limit_bytes": 201326592,
+      "threads": 1
+    },
+    {
+      "stage": "api_probe",
+      "version": null,
+      "symbols": {
+        "ncnn_net_create": true,
+        "ncnn_net_destroy": true,
+        "ncnn_net_get_option": false,
+        "ncnn_option_set_num_threads": true,
+        "ncnn_option_set_use_vulkan_compute": true,
+        "ncnn_option_set_use_packing_layout": false,
+        "ncnn_option_set_use_fp16_packed": false,
+        "ncnn_option_set_use_fp16_storage": false,
+        "ncnn_option_set_use_fp16_arithmetic": false,
+        "ncnn_option_set_use_bf16_storage": false,
+        "ncnn_net_load_param": true,
+        "ncnn_net_load_model": true,
+        "ncnn_mat_create_3d": true,
+        "ncnn_mat_destroy": true,
+        "ncnn_mat_get_channel_data": false,
+        "ncnn_mat_get_dims": true,
+        "ncnn_mat_get_w": true,
+        "ncnn_mat_get_h": true,
+        "ncnn_mat_get_c": true,
+        "ncnn_mat_get_elemsize": true,
+        "ncnn_mat_get_elempack": true,
+        "ncnn_mat_get_data": true,
+        "ncnn_extractor_create": true,
+        "ncnn_extractor_destroy": true,
+        "ncnn_extractor_input": true,
+        "ncnn_extractor_extract": true,
+        "ncnn_version": false,
+        "ncnn_layer_type_to_index": false,
+        "ncnn_layer_create_by_type": false,
+        "ncnn_layer_create_by_typeindex": false,
+        "ncnn_layer_destroy": false
+      }
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Input",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Convolution",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "GELU",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "ConvolutionDepthWise",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Split",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "MemoryData",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "BinaryOp",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Reduction",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "BatchNorm",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Reshape",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Permute",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Gemm",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Slice",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "MatMul",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Softmax",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "Pooling",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "operator_probe",
+      "name": "InnerProduct",
+      "index": null,
+      "support": "unknown",
+      "method": "unavailable"
+    },
+    {
+      "stage": "capability_result",
+      "inference_eligible": false,
+      "missing_apis": [
+        "ncnn_net_get_option",
+        "ncnn_option_set_use_packing_layout",
+        "ncnn_option_set_use_fp16_packed",
+        "ncnn_option_set_use_fp16_storage",
+        "ncnn_option_set_use_fp16_arithmetic",
+        "ncnn_option_set_use_bf16_storage",
+        "ncnn_mat_get_channel_data"
+      ],
+      "operators_all_supported": false,
+      "inference_requested": true,
+      "caveat": "Operator creation does not establish graph parameter compatibility; numerical validation is still required."
+    }
+  ],
+  "test_dates_local": [
+    "2026-10-26",
+    "2026-10-27"
+  ],
+  "stock_graph_test": {
+    "result": "isolated_helper_terminated_SIGSEGV",
+    "process_exit_code": 139,
+    "weights_loaded": false,
+    "completed_inferences": 0,
+    "cause": "unresolved; do not infer operator incompatibility solely from this failure"
+  },
+  "stock_control_graph": [
+    {
+      "stage": "start",
+      "library": "/usr/lib/libncnn.so",
+      "deadline_seconds": 30,
+      "rss_limit_bytes": 201326592,
+      "threads": 1
+    },
+    {
+      "stage": "graph_api_probe",
+      "symbols": {
+        "ncnn_net_create": true,
+        "ncnn_net_destroy": true,
+        "ncnn_net_load_param": true
+      }
+    },
+    {
+      "stage": "graph_load_start",
+      "param_bytes": 44,
+      "weights_loaded": false,
+      "inference_attempted": false
+    },
+    {
+      "stage": "graph_result",
+      "load_param_return": 0,
+      "graph_accepted": true,
+      "load_param_ms": 19.8786,
+      "rss_bytes": 20164608,
+      "sampled_peak_rss_bytes": 20164608,
+      "weights_loaded": false,
+      "inference_attempted": false,
+      "caveat": "Graph acceptance does not establish weight or numerical compatibility. A nonzero return establishes graph-load failure; inspect native diagnostics for its cause."
+    },
+    {
+      "enabled": true,
+      "covered": true,
+      "otherActive": false,
+      "message": "Commercial matched",
+      "stage": "capture",
+      "lastError": "",
+      "lastAcceptedAt": 1793073705136,
+      "covers": 2,
+      "captureMode": "card-visible",
+      "steadyCardMatches": 22,
+      "maskedFallbacks": 1,
+      "queries": 26,
+      "matches": 25,
+      "engine": "Samsung recognition only",
+      "releaseSeconds": 8,
+      "persistentApp": true,
+      "rebootReady": false,
+      "appearance": {
+        "theme": "winter",
+        "effectiveTheme": "winter",
+        "activeTheme": "default"
+      },
+      "debug": {
+        "enabled": true,
+        "startedAt": 1793065457869,
+        "expiresAt": 1793238257869,
+        "remainingSeconds": 164549,
+        "records": 736,
+        "bytes": 134071342,
+        "maxBytes": 134217728,
+        "evictedRecords": 6,
+        "message": "Recording; oldest records removed at storage limit",
+        "error": ""
+      }
+    }
+  ],
+  "cleanup": {
+    "temporary_paths_remaining": false,
+    "temporary_benchmark_processes_remaining": false,
+    "active_blocker_enabled": true,
+    "active_blocker_last_error": "",
+    "native_recognition_query_count_advancing": true
+  },
+  "memory_observations": {
+    "initial_available_kib": 277764,
+    "post_cleanup_available_kib": 99812,
+    "later_available_kib": 130420,
+    "later_swap_free_kib": 0,
+    "note": "Variable live workload; cause of lower available memory not established. Do not infer model RAM from these system readings."
+  }
+}

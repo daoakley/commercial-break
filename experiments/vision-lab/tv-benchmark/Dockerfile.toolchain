@@ -1,0 +1,8 @@
+# Isolated cross-build only. This old distribution is needed for glibc <= 2.30;
+# it must not serve traffic or be deployed as an application runtime.
+FROM debian:buster-slim@sha256:bb3dc79fddbca7e8903248ab916bb775c96ec61014b3d02b4f06043b604726dc
+RUN printf 'deb http://archive.debian.org/debian buster main\ndeb http://archive.debian.org/debian-security buster/updates main\n' > /etc/apt/sources.list \
+ && apt-get -o Acquire::Check-Valid-Until=false update \
+ && apt-get install -y --no-install-recommends cmake ninja-build g++-arm-linux-gnueabi \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /work

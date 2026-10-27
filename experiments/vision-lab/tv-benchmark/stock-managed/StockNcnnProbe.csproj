@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AssemblyName>StockNcnnProbe</AssemblyName>
+    <UseAppHost>false</UseAppHost>
+    <SelfContained>false</SelfContained>
+    <Nullable>enable</Nullable>
+    <LangVersion>8.0</LangVersion>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+</Project>

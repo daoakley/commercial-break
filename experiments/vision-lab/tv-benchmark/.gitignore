@@ -1,0 +1,13 @@
+*.bin
+*.pt
+*.onnx
+*.so
+*.dll
+*.pdb
+*.runtimeconfig.dev.json
+build*/
+bin/
+obj/
+export/
+private/
+__pycache__/

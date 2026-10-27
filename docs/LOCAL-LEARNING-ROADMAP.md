@@ -1,6 +1,6 @@
 # Native-first local commercial detection
 
-Updated 2026-10-26. This is the agreed research plan, not a claim that the planned features are already active. Priority: use a verified native answer when available; otherwise make a small, local visual decision using current TV context. The current TV blocker remains independent of the observation-only lab.
+Updated 2026-10-27. This is the agreed research plan, not a claim that the planned features are already active. Priority: use a verified native answer when available; otherwise make a small, local visual decision using current TV context. The current TV blocker remains independent of the observation-only lab.
 
 GitHub tracking: [issue #8](https://github.com/daoakley/commercial-break/issues/8). Update the issue and this register together as each path progresses.
 
@@ -20,8 +20,14 @@ GitHub tracking: [issue #8](https://github.com/daoakley/commercial-break/issues/
 | L2 | Program profiles per channel/content session | Planned | Several confirmed program examples; visual diversity; freshness and source identity; reset/revalidation on changes; no learning from covered frames or unconfirmed ads |
 | L3 | Specific commercial visual cues | Sponsored-pill matcher exists; broader cues planned | Brand/product prominence, medical-ad layouts/disclaimers, prices, phone/URL calls to action, brand-color screens; evaluate sports sponsorships and documentary product shots as counterexamples |
 | L4 | Pretrained visual model plus native context | Initial zero-shot benchmark complete; fusion planned | Compare full-frame preprocessing with original center crop on a fixed evaluation set; then compare verified metadata alone, images alone, and their combination |
-| L5 | Small TV-only deployment | Planned; no TV speed claim | Image-only export with precomputed text vectors; measure memory and latency on target; evaluate quantization; consider smaller-student distillation only if needed |
+| L5 | Small TV-only deployment | Image-only export verified; target-TV runtime compatibility blocked | [Measured feasibility report](../experiments/vision-lab/tv-benchmark/RESULTS.md): custom native mapping rejected; stock ncnn accepts a control graph but crashes on the MobileCLIP graph. Resolve runtime compatibility before claiming TV inference speed or model RAM. |
 | L6 | Iteration and regression checks | Offline experiment reports exist; automated recurring learning planned | Versioned data manifests, frozen test partitions, changes tied to errors, repeatable acceptance report, no silent promotion to playback control |
+
+## Target-TV feasibility gate
+
+The [26–27 October TV test](../experiments/vision-lab/tv-benchmark/RESULTS.md) verified four ARM cores, NEON, 1.74 GiB total RAM and limited variable available RAM. The image-only model exports to 43.3 MiB FP32 or 21.7 MiB FP16-stored weights, with synthetic numerical checks passing. The test did not complete an inference on the TV: the custom native runtime could not map, and the stock runtime crashed its isolated helper while loading the full graph. A tiny stock control graph passed. These are compatibility findings, not evidence that the CPU is too slow or that a particular operator is unsupported.
+
+Keep the native/context and offline evaluation paths moving; gate sustained TV ML deployment on one correct, bounded target inference followed by resource measurements. Weight quantization alone cannot fix the observed loading/graph failures. Temporary files were removed and the existing blocker was still operating at the final checks. No model was promoted.
 
 ## L1: label now, do not wait for fine-tuning
 
