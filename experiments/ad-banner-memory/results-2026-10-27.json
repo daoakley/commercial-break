@@ -1,0 +1,58 @@
+{
+  "status": "exploratory_historical_chronological_replay",
+  "recipe": "bottom420x35,NCC>=.95,MAE<=15,std>=15,edgesall3thirds>=.005,anchor120s",
+  "seeded": 29,
+  "all": {
+    "n": 177,
+    "ad": 24,
+    "program": 153,
+    "baseline_tp": 18,
+    "baseline_fp": 0,
+    "candidate_tp": 4,
+    "candidate_fp": 0,
+    "added_ads_count": 2,
+    "added_false_positives_count": 0
+  },
+  "heldout_old_model": {
+    "n": 128,
+    "ad": 17,
+    "program": 111,
+    "baseline_tp": 11,
+    "baseline_fp": 0,
+    "candidate_tp": 4,
+    "candidate_fp": 0,
+    "added_ads_count": 2,
+    "added_false_positives_count": 0
+  },
+  "later_development": {
+    "n": 76,
+    "ad": 8,
+    "program": 68,
+    "baseline_tp": 6,
+    "baseline_fp": 0,
+    "candidate_tp": 1,
+    "candidate_fp": 0,
+    "added_ads_count": 0,
+    "added_false_positives_count": 0
+  },
+  "caveats": [
+    "Historical development sample reused; proposed after examining misses.",
+    "Sparse frames cannot measure onset latency or block duration.",
+    "No pre-ad novelty gate yet; real broadcast logos and false Samsung positives remain risks.",
+    "Teacher availability enforced using responseAt; session resets replayed for all retained metadata."
+  ],
+  "fresh_cartoon_holdout": {
+    "program_frames": 16,
+    "ad_frames": 0,
+    "stored_ensemble_false_positive": 0,
+    "matcher_stress_false_positive": 0,
+    "actual_replay_cache_empty_due_to_expiry": true,
+    "templates_in_counterfactual_stress": 29,
+    "all_template_matching_host_ms_median": 0.8591875084675848,
+    "all_template_matching_host_ms_p95": 1.1328130058245733
+  },
+  "cache_maximum_RGB_bytes": 1411200,
+  "relative_additional_ad_frame_detection": 0.18181818181818182,
+  "relative_missed_ad_frame_reduction": 0.3333333333333333,
+  "independent_validation_of_recall_improvement": false
+}
