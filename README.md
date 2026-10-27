@@ -175,4 +175,4 @@ This project builds on the independent [samsung-tv-root](https://github.com/chri
 
 ### Standalone TV appearance preview
 
-See [TV appearance themes](tv-standalone/README.md) for the isolated standalone controller source, seasonal/holiday/zen scenes, offline preview, and validation instructions. This feature is not yet installed or validated on a TV.
+See [TV appearance themes](tv-standalone/README.md) for the isolated standalone controller source, seasonal/holiday/zen scenes, offline preview, and validation instructions. Installed on the development Frame TV; physical navigation and themed-overlay appearance still await viewer validation.
