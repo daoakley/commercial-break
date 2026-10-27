@@ -59,8 +59,22 @@ def city_scenes(base,rect,ellipse,poly,line,add):
           block(811,914,80,96,side);block(1108,873,112,137);block(1121,859,86,14)
           block(1211,927,90,83,side);block(1453,902,95,108)
           lowrise([(270,135,50),(390,114,68),(640,81,66),(856,77,50),(1018,97,53),(1530,125,56)],front)
-          # Soft tree canopy, with smaller overlapping crowns than the old hills.
-          for x,y,w,h in [(0,1010,310,100),(245,994,190,100),(380,1016,220,90),(545,1012,210,95),(695,1024,230,90),(875,1012,210,100),(1030,1026,250,85),(1230,1012,235,100),(1420,998,200,110),(1580,1016,240,95),(1750,1026,200,85)]:o.append(ellipse(x,y,w,h,ground))
+          # Raleigh is inland: a continuous, irregular green tree line, not
+          # broad blue wave-like ellipses or an exposed horizontal water band.
+          ground='#1C302C' if night else '#3A554B'
+          foliage='#294039' if night else '#50695B'
+          canopy=[(0,1080),(0,989)]
+          for x in range(0,1921,20):
+            y=987+12*math.sin(x*.019)+8*math.sin(x*.057)+5*math.cos(x*.131)
+            canopy.append((x,round(y)))
+          canopy.append((1920,1080));shape(canopy,ground)
+          # Individual upright crowns give the foreground an unmistakable
+          # wooded character while leaving the landmark roofs unobstructed.
+          for x,y,s in [(160,969,1),(308,952,1.15),(690,970,.85),(1180,966,.9),(1548,951,1.2),(1745,970,.9)]:
+            block(round(x+24*s),round(y+32*s),round(5*s),round(60*s),ground)
+            o.append(ellipse(x,round(y+18*s),round(53*s),round(50*s),foliage))
+            o.append(ellipse(round(x+12*s),round(y-8*s),round(34*s),round(52*s),foliage))
+            o.append(ellipse(round(x+29*s),round(y+24*s),round(32*s),round(40*s),foliage))
         elif city=='memphis':
           lowrise([(1010,85,100),(1110,85,160),(1235,70,122),(1350,90,90),(1490,90,130),(1620,75,100),(1720,130,65)],back)
           # North riverbank Pyramid, a distinctive low, wide profile.
