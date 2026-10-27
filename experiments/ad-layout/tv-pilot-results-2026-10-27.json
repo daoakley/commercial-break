@@ -1,0 +1,26 @@
+{
+  "experiment": "TV-local spatial layout pilot",
+  "date": "2026-10-27",
+  "status": "owner_authorized_live_pilot_not_validated_accuracy",
+  "worker_frames": 28,
+  "startup_ms": 1486.7506,
+  "handoff_response_median_ms": 82.53855,
+  "handoff_response_max_ms": 238.4298,
+  "max_worker_rss_bytes": 30654464,
+  "parity_fixture_count": 7,
+  "parity_decision_agreement": 7,
+  "max_absolute_margin_difference": 0.000454,
+  "model_dimensions": 141,
+  "support_vectors": 44,
+  "private_model_bytes": 147944,
+  "fixed_margin": 0.5,
+  "live_first_check_count": 50,
+  "live_first_check_errors": 0,
+  "live_latest_worker_ms": 58.5448,
+  "caveats": [
+    "Microbenchmark includes repeated fixtures, not production latency distribution.",
+    "Sparse held-out assistant labels and post-hoc cutoff cannot establish live recall or false-block rate.",
+    "No cartoons in the held-out evaluation.",
+    "Private model, screenshots, identifiers, and raw diagnostics are not published."
+  ]
+}

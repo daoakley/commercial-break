@@ -76,3 +76,7 @@ The 23-theme catalog includes eight original vector city compositions. `scripts/
 Architectural references were studied, not bundled or traced as raster assets: [Raleigh photograph](https://raleighskyline.com/2015/downtown-raleigh-in-the-spring-2015/3340/raleigh-aerial-of-pnc-plaza/), [Charlotte office photograph](https://www.parkerpoe.com/offices/charlotte), [Memphis tourism](https://www.memphistravel.com/neighborhoods/downtown), [DC landmark view-plane study](https://planning.dc.gov/am/page/capital-landmarks-view-plane-study).
 
 Updating existing custom scenes to clock-only requires both the generated JSON and the rebuilt native overlay. A controller-only update cannot hide native stats. The coordinated v0.4.0 deployment preserves private configuration and the saved theme; it includes the engine allowlist, renderer, theme JSON and signed controller.
+
+## Optional experimental advertising-layout pilot
+
+See [EXPERIMENTAL_LAYOUT.md](EXPERIMENTAL_LAYOUT.md) for the separately switchable TV-local pilot, its measured cost, limitations, and off command.

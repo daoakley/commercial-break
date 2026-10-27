@@ -134,8 +134,9 @@ internal static class Program
 
     private static byte Clamp(double v) => v < 0 ? (byte)0 : v > 255 ? (byte)255 : (byte)v;
 
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if(args.Length==2&&args[0]=="--layout-worker"&&int.TryParse(args[1],out int parentPid)&&parentPid>1)return LayoutDetector.Worker(parentPid);
         string basename = Environment.GetEnvironmentVariable("CAPTURE_FILE_BASENAME") ?? "commercial-block-frame";
         if (basename.Length == 0 || basename.IndexOfAny(new[] { '/', '\\' }) >= 0) return 2;
         string path = "/opt/usr/home/owner/commercial-block/" + basename + ".png";
@@ -169,6 +170,8 @@ internal static class Program
             long captureMillis;
             long imageAt = 0;
             bool pillHit = false;
+            byte[] layoutRgb = null;
+            bool layoutQueued=false;
             try
             {
                 if (cardActive)
@@ -255,6 +258,19 @@ internal static class Program
                 Console.WriteLine($"rc=-100 width={width} height={height} pitch={pitch} backend=acr");
                 return 1;
             }
+            // Feed the separately warmed, isolated worker AFTER panel restoration.
+            // Atomic latest-frame handoff; no image history is kept by this path.
+            if (!keepCard && !pillHit && Environment.GetEnvironmentVariable("CAPTURE_CHECK_LAYOUT") == "1")
+            {
+                try {
+                    layoutRgb = LayoutDetector.RgbNv12(y,c,width,height,pitch,PlaneBytes);
+                    string pending="/run/commercial-block/layout-frame.bin";
+                    using(var file=new FileStream(pending+".tmp",FileMode.Create,FileAccess.Write)){
+                        byte[] at=BitConverter.GetBytes(imageAt);file.Write(at,0,at.Length);file.Write(layoutRgb,0,layoutRgb.Length);
+                    }
+                    File.Move(pending+".tmp",pending,true);layoutQueued=true;
+                }catch(Exception){ /* existing fingerprint/Sponsored result remains valid */ }
+            }
             if (Environment.GetEnvironmentVariable("CAPTURE_FINGERPRINT_ONLY") == "1")
             {
                 File.WriteAllText("/run/commercial-block/capture-diagnostics.json",
@@ -264,33 +280,14 @@ internal static class Program
                         panelMaskMillis = masked.ElapsedMilliseconds,
                         totalMillis = clock.ElapsedMilliseconds
                     }));
-                if(!debugImage)return pillHit || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
+                if(!debugImage)return pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
             }
             try {
             // NV12 (BT.601) -> RGB, nearest-neighbour resample to 480x270.
             byte[] raw = new byte[(OutWidth * 3 + 1) * OutHeight];
-            byte[] yRow = new byte[pitch];
-            byte[] cRow = new byte[pitch];
-            int lastRow = -1, lastCRow = -1;
-            for (int oy = 0; oy < OutHeight; oy++)
-            {
-                int sy = (int)((long)oy * height / OutHeight);
-                if (sy != lastRow) { Marshal.Copy(IntPtr.Add(y, sy * pitch), yRow, 0, pitch); lastRow = sy; }
-                int cy = sy / 2;
-                if (cy != lastCRow) { Marshal.Copy(IntPtr.Add(c, cy * pitch), cRow, 0, pitch); lastCRow = cy; }
-                int rowOffset = oy * (OutWidth * 3 + 1);
-                raw[rowOffset] = 0; // filter: none
-                for (int ox = 0; ox < OutWidth; ox++)
-                {
-                    int sx = (int)((long)ox * width / OutWidth);
-                    double luma = yRow[sx];
-                    double u = cRow[(sx / 2) * 2] - 128, v = cRow[(sx / 2) * 2 + 1] - 128;
-                    int o = rowOffset + 1 + ox * 3;
-                    raw[o] = Clamp(luma + 1.402 * v);
-                    raw[o + 1] = Clamp(luma - 0.344 * u - 0.714 * v);
-                    raw[o + 2] = Clamp(luma + 1.772 * u);
-                }
-            }
+            byte[] rgb = layoutRgb ?? LayoutDetector.RgbNv12(y,c,width,height,pitch,PlaneBytes);
+            for(int row=0;row<OutHeight;row++)
+                Buffer.BlockCopy(rgb,row*OutWidth*3,raw,row*(OutWidth*3+1)+1,OutWidth*3);
             byte[] ihdr = { 0, 0, (byte)(OutWidth >> 8), unchecked((byte)OutWidth), 0, 0, (byte)(OutHeight >> 8), unchecked((byte)OutHeight), 8, 2, 0, 0, 0 };
             string temp = path + ".tmp";
             using (var file = new FileStream(temp, FileMode.Create, FileAccess.Write))
@@ -307,7 +304,7 @@ internal static class Program
                 // Debug disk/encoding failures never invalidate recognition.
                 try{File.Delete(path);File.Delete(path+".tmp");}catch{}
                 Console.Error.WriteLine("debug_image_unavailable");
-                return pillHit || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
+                return pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
             }
         }
         finally
