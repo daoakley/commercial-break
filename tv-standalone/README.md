@@ -20,7 +20,7 @@ graphic; save it to restore that design. Remote directional keys and Enter
 navigate; Back closes the selector. A saved theme applies to the next break.
 An active break card keeps its current artwork.
 
-The 23 choices are:
+The 26 choices are:
 
 - Original.
 - Seasons: Spring blossom, Summer shore, Autumn amber, Winter stillness.
@@ -28,11 +28,22 @@ The 23 choices are:
   Halloween moon, Thanksgiving harvest, Christmas woodland.
 - Zen: Desert quiet, Quiet water, Mist & mountains.
 - City skylines: Raleigh, Memphis, Washington DC and Charlotte, each in Day
-  and Night.
+  and Night, plus automatic, day-only and night-only city rotation.
 
 Custom scenes show only the clock in the upper-right, with no program metadata
 or break statistics over the artwork. Original retains its original information
-layout. Day/night and holiday choices are manual, not calendar-driven.
+layout. **Rotate cities · Automatic** cycles Memphis → Washington DC → Raleigh →
+Charlotte. Day/night follows Raleigh sunrise and sunset using NOAA solar-position
+math and the TV clock, entirely offline. The location is currently fixed to Raleigh.
+The current scene stays fixed until the break ends, including through capture
+pauses and lease renewals. The next-city cursor survives engine restarts. A new
+break means the detector enters covered state; if it releases and re-enters within
+one broadcast ad pod, that counts as another break for rotation.
+
+Day-only/night-only rotation and individual city choices remain available.
+Holiday themes are selected manually. Missing or corrupt city assets are skipped;
+if no valid scene exists for the selected lighting, Original is used. A cursor
+write failure does not prevent ad covering.
 The current Raleigh scenes use revised PNC and Wells Fargo silhouettes and a
 wooded foreground. Artwork consists of original geometric compositions rendered
 locally with EFL primitives; no downloaded art or animation service is needed.
