@@ -18,3 +18,10 @@ for t in entries:
         if o['type'] == 'polygon': assert 3 <= len(o['points']) <= 128
     assert len(json.dumps(scene)) < 1024*1024
 print('15 offline scene catalogs validated; Original preserved.')
+
+# A modern browser silently accepted inset; the target TV did not.
+css = (root/'app/appearance.css').read_text()
+assert 'inset:' not in css
+for edge in ('top:0','right:0','bottom:0','left:0'):
+    assert edge in css.split('#appearance-panel{',1)[1].split('}',1)[0]
+print('Legacy TV full-screen positioning uses explicit edges.')

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://commercial-block.local/tv" version="0.3.0" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://commercial-block.local/tv" version="0.3.2" viewmodes="maximized">
  <tizen:application id="nCBlkTv001.CommercialBlock" package="nCBlkTv001" required_version="3.0"/>
  <name>Commercial Break</name><content src="index.html"/><icon src="icon.png"/>
  <access origin="http://127.0.0.1:18764" subdomains="false"/>
