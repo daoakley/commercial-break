@@ -1,0 +1,12 @@
+*
+!requirements.txt
+!server.py
+!storage.py
+!detector.py
+!sponsored_badge.py
+!sponsored_template.json
+!train.py
+!teacher_train.py
+!evaluate.py
+!diagnose.py
+!review.html

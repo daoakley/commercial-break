@@ -1,0 +1,29 @@
+services:
+  vision-lab:
+    build: .
+    ports:
+      - "127.0.0.1:8795:8795"
+    env_file:
+      - ${LAB_ENV_FILE:-./private/lab.env}
+    environment:
+      LAB_RETENTION_HOURS: "48"
+      LAB_STORAGE_CAP_BYTES: "536870912"
+    volumes:
+      - lab-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8795/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  lab-data:

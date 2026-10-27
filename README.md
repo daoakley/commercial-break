@@ -8,6 +8,8 @@ This repository shares **source and reproduction steps**, not an installable Sam
 
 ## Status
 
+The separate [local visual research lab](experiments/vision-lab/README.md) contains the current observation-only capture review, Samsung-positive learning, and pretrained MobileCLIP experiments. See the [learning roadmap](docs/LOCAL-LEARNING-ROADMAP.md) for implemented versus planned work, validation requirements, and the path toward TV-only inference. These experiments do not replace or activate the production detector described below.
+
 This is a personal prototype that works on one TV. It is published so that others with the same hardware can reproduce it and so that the approach is documented. Open work is tracked in the [issue tracker](https://github.com/daoakley/commercial-break/issues); in particular, the delay between an ad starting and the card appearing is still measured in seconds, and the return to program content takes longer than that because screenshots taken while the card is up briefly expose the screen.
 
 ## What was tested

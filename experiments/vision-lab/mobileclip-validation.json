@@ -1,0 +1,45 @@
+{
+  "model": "MobileCLIP2-S0",
+  "revision": "3136ea51c8ed56b9f9abfab04cb816735aaad6cb",
+  "checkpoint_sha256": "bc3bc861baa680df2f9e3dc1aa0acbe5a21af21032df385026dda70c33505aa6",
+  "observation_only": true,
+  "trained_on_study": false,
+  "device": "cpu",
+  "threads": 2,
+  "versions": {
+    "torch": "2.14.1",
+    "open_clip": "3.3.0"
+  },
+  "sampling": "all eligible Samsung positives plus uniformly spaced other clean frames",
+  "summaries": {
+    "simple": {
+      "teacher_positives": 40,
+      "teacher_positives_called_ad": 33,
+      "teacher_positives_called_ad_margin_002": 17,
+      "other_frames": 300,
+      "other_frames_called_ad": 173,
+      "other_frames_called_ad_margin_002": 21
+    },
+    "descriptive": {
+      "teacher_positives": 40,
+      "teacher_positives_called_ad": 28,
+      "teacher_positives_called_ad_margin_002": 22,
+      "other_frames": 300,
+      "other_frames_called_ad": 82,
+      "other_frames_called_ad_margin_002": 41
+    }
+  },
+  "failures": {},
+  "compute_ms": {
+    "median": 85.43518748774659,
+    "p95": 98.01424999022856
+  },
+  "limitations": [
+    "Samsung agreement is not accuracy. Unknown is not programming.",
+    "Related frames are correlated, not independent commercials.",
+    "Both fixed prompt variants are exploratory; neither is a validated operating policy.",
+    "Similarity margins are uncalibrated; .02 is a preregistered exploratory abstention threshold.",
+    "CPU timing excludes fetch, image decoding and preprocessing; not TV latency."
+  ],
+  "visual_review": "31 selected disagreements reviewed by assistant, not human truth. Visible ad cues in several missed frames; apparent documentary/program scenes among positive predictions. No overall accuracy estimate."
+}

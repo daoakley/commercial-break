@@ -1,0 +1,104 @@
+{
+  "checked_unix": 1793067996.8301172,
+  "lab_tests_passed": 35,
+  "dashboard_tests_passed": 47,
+  "native_connected": true,
+  "native_usable": true,
+  "lab": {
+    "samples": 686,
+    "prototypes": 0,
+    "storage_bytes": 116882703,
+    "storage_cap_bytes": 536870912,
+    "retention_hours": 48.0,
+    "observation_only": true,
+    "uptime_seconds": 133
+  },
+  "benchmark": {
+    "equivalence": {
+      "enabled": true,
+      "images_checked": 141,
+      "maximum_absolute_error": 0.0,
+      "score_tolerance": 0,
+      "threshold_changed": false
+    },
+    "counts": {
+      "observations": 441,
+      "samsung_same_session": 441,
+      "native_guard_usable": 354,
+      "human_labelled": 0,
+      "human_clean_labelled": 0,
+      "original_live_eligible": 216,
+      "not_clean_excluded": 108,
+      "images_loaded": 333,
+      "replay_eligible": 333,
+      "single_frame_badge_above_threshold": 0,
+      "samsung_definite_comparable": 7,
+      "same_decision_as_samsung": 0
+    },
+    "timings_ms": {
+      "feature_extraction": {
+        "count": 333,
+        "p50": 0.18008300685323775,
+        "p95": 0.24670859565958378,
+        "max": 0.4055410099681467,
+        "mean": 0.19171008308468437
+      },
+      "detector_including_features": {
+        "count": 333,
+        "p50": 0.16933298320509493,
+        "p95": 0.24719961220398542,
+        "max": 0.4095829790458083,
+        "mean": 0.19064826688759992
+      },
+      "detector_badge_applicable": {
+        "count": 141,
+        "p50": 0.22329099010676146,
+        "p95": 0.257334002526477,
+        "max": 0.4095829790458083,
+        "mean": 0.2305020418444133
+      },
+      "detector_badge_inapplicable": {
+        "count": 192,
+        "p50": 0.1578539959155023,
+        "p95": 0.18280654185218737,
+        "max": 0.2332500007469207,
+        "mean": 0.16138065090369005
+      },
+      "badge_score_image_only": {
+        "count": 141,
+        "p50": 0.03479100996628404,
+        "p95": 0.04641700070351362,
+        "max": 0.22083299700170755,
+        "mean": 0.03717585214156103
+      },
+      "method": "Single pass, actual retained clean images, CPU wall clock. File I/O and Pillow decoding excluded. Feature extraction measured separately; detector includes its own extraction and direct NumPy badge scoring when applicable. No PNG encode/decode in compute path. Optional reference equivalence audit excluded from timings. Do not add the separate timing groups. No warmup removal, no GPU/TV inference claim."
+    },
+    "expires_unix": 1793238257.869
+  },
+  "baseline_compute_p95_ms": 36.94563340977765,
+  "accuracy_validated": false,
+  "model_activated": false,
+  "tv_capture_settings_changed": false,
+  "tv_blocker_policy_changed": false,
+  "samsung_positive_experiment": {
+    "status": "teacher_mimicry_diagnostic_only",
+    "observations": 1455,
+    "usable_images": 1128,
+    "clean_samsung_positives": 26,
+    "positive_bursts": 12,
+    "train_positives": 19,
+    "validation_positives": 4,
+    "validation_recovered": 0,
+    "test_positives": 3,
+    "test_recovered": 0,
+    "fixed_similarity_threshold": 0.985,
+    "human_program_labels": 0,
+    "false_positive_rate": null,
+    "all_positive_candidate_exemplars": 26,
+    "fingerprint_p95_ms": 0.293,
+    "matching_validation_p95_ms": 0.7002,
+    "lab_tests_passed": 43,
+    "live_activation": false,
+    "notes": "Local compute only, excludes I/O. Samsung unknown is unlabelled; no unseen-creative or accuracy claim. Detailed records and models remain in retained Docker artifacts."
+  }
+}
