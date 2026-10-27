@@ -167,6 +167,8 @@ internal static class Program
             Process rescue = null;
             int rc;
             long captureMillis;
+            long imageAt = 0;
+            bool pillHit = false;
             try
             {
                 if (cardActive)
@@ -195,10 +197,32 @@ internal static class Program
                 }
                 // 3. Capture: the frame is latched inside this call (~150 ms).
                 var captureClock = Stopwatch.StartNew();
-                long imageAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                imageAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 rc = CaptureScreen(SourceWidth, SourceHeight, parameter);
                 captureMillis = captureClock.ElapsedMilliseconds;
-                if (rc == 0) SecureFingerprint.TryCaptureDue(imageAt);
+                if (rc == 0 && !keepCard && Environment.GetEnvironmentVariable("CAPTURE_CHECK_SPONSORED") == "1")
+                {
+                    // Inspect only 924 reference pixels directly from the existing NV12 planes.
+                    // This path needs neither a full RGB frame nor a PNG, and works with debug off.
+                    try
+                    {
+                        int w = Marshal.ReadInt32(parameter, 0x08), h = Marshal.ReadInt32(parameter, 0x0c), stride = Marshal.ReadInt32(parameter, 0x2c);
+                        if ((long)stride * h > PlaneBytes) throw new ArgumentException("capture plane bounds");
+                        var pillClock = Stopwatch.StartNew();
+                        double score = SponsoredPill.ScoreNv12(y, c, w, h, stride);
+                        double elapsedMs = pillClock.Elapsed.TotalMilliseconds;
+                        bool hit = score >= SponsoredPill.Threshold;
+                        string resultPath = "/run/commercial-block/sponsored-pill.json";
+                        File.WriteAllText(resultPath + ".tmp", System.Text.Json.JsonSerializer.Serialize(new {
+                            at = imageAt, score, hit, keepCard, elapsedMs, width = w, height = h,
+                            threshold = SponsoredPill.Threshold, detector = "youtube-tv-sponsored-v1"
+                        }));
+                        File.Move(resultPath + ".tmp", resultPath, true);
+                        pillHit = hit;
+                    }
+                    catch { /* Optional local check failure preserves the existing Samsung path. */ }
+                }
+                if (rc == 0 && !pillHit) SecureFingerprint.TryCaptureDue(imageAt);
             }
             finally
             {
@@ -240,7 +264,7 @@ internal static class Program
                         panelMaskMillis = masked.ElapsedMilliseconds,
                         totalMillis = clock.ElapsedMilliseconds
                     }));
-                if(!debugImage)return File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
+                if(!debugImage)return pillHit || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
             }
             try {
             // NV12 (BT.601) -> RGB, nearest-neighbour resample to 480x270.
@@ -283,7 +307,7 @@ internal static class Program
                 // Debug disk/encoding failures never invalidate recognition.
                 try{File.Delete(path);File.Delete(path+".tmp");}catch{}
                 Console.Error.WriteLine("debug_image_unavailable");
-                return File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
+                return pillHit || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
             }
         }
         finally

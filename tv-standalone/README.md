@@ -1,4 +1,6 @@
-# Commercial Break: TV appearance themes
+# Commercial Break: standalone TV app
+
+The local [Sponsored-pill fast path](SPONSORED_PILL.md) checks YouTube TV captures before Samsung recognition. It runs without an AI service and retains the existing theme, navigation, and release safeguards.
 
 This source snapshot adds a **Break screen** selector to the standalone Samsung-only controller. It is separate from the computer-assisted blocker at the repository root. The feature branch has been built and tested offline and previewed in a browser; it has now been installed on the development Frame TV. The engine and controller installation and saved Original preference are verified; physical remote navigation and themed overlays still need viewer validation.
 
