@@ -28,6 +28,7 @@ internal static class Program
     // never did. Defaults are twice the last clean values.
     private static readonly int PanelDarkLeadMillis = EnvInt("ACR_PANEL_LEAD_MS", 100, 0, 1000);
     private static readonly int PanelCardReturnMillis = EnvInt("ACR_PANEL_RETURN_MS", 60, 0, 1000);
+    private const string PanelOwned = "/run/commercial-block/owned-panel-mask";
     private const string BacklightService = "org.tizen.tv.avoc";
     private const string BacklightObject = "/org/tizen/tv/avoc";
     private const string BacklightInterface = "org.tizen.tv.avoc.AvOutputControl";
@@ -180,6 +181,7 @@ internal static class Program
                     if (PanelMaskWanted() && LfdPanelMute() == 0)
                     {
                         rescue = StartPanelRescue();
+                        if (rescue != null) File.WriteAllText(PanelOwned, "1");
                         if (rescue != null && SetLfdPanelMute(1) && LfdPanelMute() == 1)
                         {
                             masked.Start();
@@ -243,6 +245,7 @@ internal static class Program
                     if (panel == 1 && SetLfdPanelMute(0)) panel = LfdPanelMute();
                     if (masked.IsRunning) masked.Stop();
                     // Unknown or still-muted state: leave the timed rescue alive.
+                    if (panel == 0) File.Delete(PanelOwned);
                     if (panel == 0 && !rescue.HasExited) { try { rescue.Kill(); } catch (InvalidOperationException) { } }
                     rescue.Dispose();
                 }
