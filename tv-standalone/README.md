@@ -57,3 +57,9 @@ For an existing compatible installation, a coordinated release needs the rebuilt
 The first deployed UI used CSS `inset`, unsupported by the Frame's Chromium 85 browser, so the fixed panel remained below the main document. Explicit top/right/bottom/left and width/height replace it. The preview now also loads the controller stylesheet. The viewer confirmed that preview, categories and Save are fully visible after this correction.
 
 Private packaging must preserve `device.js` from the prior signed package or generate it from the installation's existing private control token; the public source placeholder cannot authenticate. v0.3.2 restores the exact pre-update credential file, with no token rotation or new permissions. Verify package identity, nonempty credential and equality to the existing installation credential **before** installing. Do not print or commit the credential.
+
+### Warm-renderer theme changes
+
+The renderer remains alive in standby between breaks. The engine now retires a stale renderer before starting a new break when its loaded theme differs from the saved effective theme. Saving during an active break keeps that card stable; the next break uses the new scene. Unchanged themes retain the warm process.
+
+`dotnet run --project tv-standalone/tests/theme-lifecycle/LifecycleTests.csproj -- tv-standalone/engine` exercises the engine helper with a real temporary child process, without accessing TV services: unchanged renderer stays alive, active cover stays alive after selection changes, idle stale renderer exits, and saved settings survive.

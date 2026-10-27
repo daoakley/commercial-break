@@ -62,7 +62,15 @@ class Program {
   if(Watchdog==null||Watchdog.HasExited)Watchdog=SpawnScript(File.ReadAllText(Home+"/watchdog.sh"));
  }
  static long NavigationAt(){try{return long.Parse(File.ReadAllText(State+"/navigation"));}catch{return 0;}}
- static void Cover(){lock(Gate){if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;if(!Covered){CoverSince=Now();Covers++;Record("cover","fresh ad match");
+ // The renderer stays alive, hidden, between leases. Retire stale artwork only
+ // while uncovered so the next break uses the saved scene without flashing an
+ // active break or losing the warm renderer when the theme has not changed.
+ static void RefreshIdleOverlay(){
+  if(Covered||Overlay==null||CoverTheme==Themes.EffectiveTheme)return;
+  if(!Overlay.HasExited){Overlay.Kill();if(!Overlay.WaitForExit(1500))throw new IOException("Previous theme renderer did not exit");}
+  Overlay.Dispose();Overlay=null;
+ }
+ static void Cover(){lock(Gate){if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;RefreshIdleOverlay();if(!Covered){CoverSince=Now();Covers++;Record("cover","fresh ad match");
   string mute=Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager GetSpeakerMute");
   if(mute.Trim()=="ii 0 0"){File.WriteAllText(State+"/owned-mute","1");Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b true");OwnMute=true;}
  }File.WriteAllText(State+"/overlay-lease",Now().ToString());
