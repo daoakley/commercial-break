@@ -90,6 +90,45 @@
     "description": "Layered green ridgelines fading into mist."
   },
   {
+    "id": "cities-auto",
+    "name": "Rotate cities \u00b7 Automatic",
+    "category": "City skylines",
+    "description": "Memphis \u2192 DC \u2192 Raleigh \u2192 Charlotte. Day and night follow Raleigh sunrise and sunset. A different city for each new detected break.",
+    "automatic": true,
+    "rotation": [
+      "memphis-day",
+      "dc-day",
+      "raleigh-day",
+      "charlotte-day"
+    ]
+  },
+  {
+    "id": "cities-day",
+    "name": "Rotate cities \u00b7 Day",
+    "category": "City skylines",
+    "description": "Memphis \u2192 DC \u2192 Raleigh \u2192 Charlotte. A different city for each new detected break.",
+    "automatic": false,
+    "rotation": [
+      "memphis-day",
+      "dc-day",
+      "raleigh-day",
+      "charlotte-day"
+    ]
+  },
+  {
+    "id": "cities-night",
+    "name": "Rotate cities \u00b7 Night",
+    "category": "City skylines",
+    "description": "Memphis \u2192 DC \u2192 Raleigh \u2192 Charlotte. A different city for each new detected break.",
+    "automatic": false,
+    "rotation": [
+      "memphis-night",
+      "dc-night",
+      "raleigh-night",
+      "charlotte-night"
+    ]
+  },
+  {
     "id": "raleigh-day",
     "name": "Raleigh \u00b7 Day",
     "category": "City skylines",
