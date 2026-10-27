@@ -1,0 +1,77 @@
+{
+  "status": "same_dataset_posthoc_diagnostic_not_validation",
+  "baseline_ad_frames": 12,
+  "ad_frames": 24,
+  "program_frames": 153,
+  "folds": [
+    {
+      "group": 0,
+      "train": 128,
+      "test": 49
+    },
+    {
+      "group": 1,
+      "train": 49,
+      "test": 128
+    }
+  ],
+  "cutoffs": [
+    {
+      "cutoff": 0,
+      "additional_ad_frames": 4,
+      "additional_program_false_positives": 3,
+      "ad_frames_total_with_baseline": 16,
+      "forward_additional_ads": 1,
+      "forward_false_positives": 0
+    },
+    {
+      "cutoff": 0.1,
+      "additional_ad_frames": 4,
+      "additional_program_false_positives": 3,
+      "ad_frames_total_with_baseline": 16,
+      "forward_additional_ads": 1,
+      "forward_false_positives": 0
+    },
+    {
+      "cutoff": 0.25,
+      "additional_ad_frames": 3,
+      "additional_program_false_positives": 2,
+      "ad_frames_total_with_baseline": 15,
+      "forward_additional_ads": 1,
+      "forward_false_positives": 0
+    },
+    {
+      "cutoff": 0.5,
+      "additional_ad_frames": 3,
+      "additional_program_false_positives": 0,
+      "ad_frames_total_with_baseline": 15,
+      "forward_additional_ads": 1,
+      "forward_false_positives": 0
+    },
+    {
+      "cutoff": 0.75,
+      "additional_ad_frames": 0,
+      "additional_program_false_positives": 0,
+      "ad_frames_total_with_baseline": 12,
+      "forward_additional_ads": 0,
+      "forward_false_positives": 0
+    },
+    {
+      "cutoff": 1.0,
+      "additional_ad_frames": 0,
+      "additional_program_false_positives": 0,
+      "ad_frames_total_with_baseline": 12,
+      "forward_additional_ads": 0,
+      "forward_false_positives": 0
+    }
+  ],
+  "above_highest_program_score": {
+    "additional_ads": 3
+  },
+  "limitations": [
+    "The cutoff sweep reuses the prior reviewed sample; it cannot certify improved live performance.",
+    "No cartoons or independent human labels.",
+    "Counts are sampled frames, not commercial breaks or time blocked.",
+    "No TV changes and no images or trained model saved."
+  ]
+}
