@@ -14,7 +14,38 @@ class Tests {
    Check(new ThemeSettings(dir).Selected=="default","invalid saved scene fallback");
    File.WriteAllText(Path.Combine(dir,"appearance.json"),"not json");Check(new ThemeSettings(dir).Selected=="default","bad settings fallback");
    s.Set("default");Check(new ThemeSettings(dir).Selected=="default","restore original");
+   foreach(string city in new[]{"memphis","dc","raleigh","charlotte"})foreach(string mode in new[]{"day","night"})
+    File.Copy(Path.Combine(args[0],"themes",city+"-"+mode+".json"),Path.Combine(dir,"themes",city+"-"+mode+".json"));
+   DateTimeOffset instant=DateTimeOffset.Parse("2026-06-21T16:00:00Z");
+   var auto=new ThemeSettings(dir,()=>instant);auto.Set("cities-auto");auto.BeginBreak();
+   Check(auto.EffectiveTheme=="memphis-day","summer noon uses day");
+   instant=DateTimeOffset.Parse("2026-06-22T03:00:00Z");auto.BeginBreak();Check(auto.EffectiveTheme=="memphis-day","sunset does not change active break");
+   auto.EndBreak();auto.BeginBreak();Check(auto.EffectiveTheme=="dc-night","next break uses night");auto.EndBreak();
+   foreach(string date in new[]{"2026-01-15","2026-03-08","2026-11-01","2028-02-29"}) {
+    Check(ThemeSettings.IsRaleighDay(DateTimeOffset.Parse(date+"T17:00:00Z")),"winter/DST/leap noon");
+    Check(!ThemeSettings.IsRaleighDay(DateTimeOffset.Parse(date+"T05:00:00Z")),"winter/DST/leap midnight");
+   }
+   Check(!ThemeSettings.IsRaleighDay(DateTimeOffset.Parse("2026-10-27T10:45:00Z"))&&ThemeSettings.IsRaleighDay(DateTimeOffset.Parse("2026-10-27T12:00:00Z")),"October sunrise brackets");
+   Check(ThemeSettings.IsRaleighDay(DateTimeOffset.Parse("2026-10-27T21:45:00Z"))&&!ThemeSettings.IsRaleighDay(DateTimeOffset.Parse("2026-10-27T23:00:00Z")),"October sunset brackets");
+   auto.Set("default");
+   s.Set("cities-night");
+   foreach(string city in new[]{"memphis","dc","raleigh","charlotte","memphis"}) {
+    s.BeginBreak();Check(s.EffectiveTheme==city+"-night","ordered city rotation");
+    for(int i=0;i<10;i++){s.BeginBreak();Check(s.EffectiveTheme==city+"-night","renewals keep the same city");}
+    s.EndBreak();
+   }
+   s=new ThemeSettings(dir);s.BeginBreak();Check(s.EffectiveTheme=="dc-night","next city survives restart");
+   s.Set("cities-day");Check(s.EffectiveTheme=="dc-night","palette change keeps active break");
+   s.EndBreak();s.BeginBreak();Check(s.EffectiveTheme=="raleigh-day","day palette applies next break");
+   s.EndBreak();File.WriteAllText(Path.Combine(dir,"themes","charlotte-day.json"),"{}");
+   s.BeginBreak();Check(s.EffectiveTheme=="memphis-day","corrupt city skipped");s.EndBreak();
+   foreach(string city in new[]{"memphis","dc","raleigh","charlotte"})File.WriteAllText(Path.Combine(dir,"themes",city+"-day.json"),"{}");
+   s.BeginBreak();Check(s.EffectiveTheme=="default","all missing cities fall back to Original");s.EndBreak();
+   s.Set("raleigh-night");s.BeginBreak();s.EndBreak();s.BeginBreak();Check(s.EffectiveTheme=="raleigh-night","fixed theme never rotates");
+   s.EndBreak();s.Set("cities-night");File.Delete(Path.Combine(dir,"appearance.json"));Directory.CreateDirectory(Path.Combine(dir,"appearance.json"));
+   s.BeginBreak();Check(s.EffectiveTheme=="memphis-night","cursor write failure does not block rendering");
    Console.WriteLine("Theme settings: persistence, invalid input, missing/corrupt scene and original restoration passed.");
+   Console.WriteLine("Rotation: sequence, renewals, restart, palette changes, missing scenes and failed cursor writes passed.");
   }finally{Directory.Delete(dir,true);}
  }
 }
