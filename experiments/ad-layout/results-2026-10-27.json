@@ -1,0 +1,159 @@
+{
+  "status": "exploratory_only_not_for_deployment",
+  "reviewed_frames": 187,
+  "assistant_labeled_ad": 24,
+  "assistant_labeled_program": 153,
+  "excluded_unknown": 10,
+  "held_out_program_blocks": [
+    {
+      "held_out": "industry_and_border",
+      "train_frames": 128,
+      "test_frames": 49,
+      "train_ads": 17,
+      "test_ads": 7,
+      "same_frame_native_baseline": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 5,
+        "tn": 42,
+        "ad_frame_recall": 0.2857142857142857,
+        "precision": 1.0
+      },
+      "flat_fraction": {
+        "alone": {
+          "tp": 2,
+          "fp": 19,
+          "fn": 5,
+          "tn": 23,
+          "ad_frame_recall": 0.2857142857142857,
+          "precision": 0.09523809523809523
+        },
+        "combined_same_frame": {
+          "tp": 3,
+          "fp": 19,
+          "fn": 4,
+          "tn": 23,
+          "ad_frame_recall": 0.42857142857142855,
+          "precision": 0.13636363636363635
+        },
+        "additional_ad_frames": 1,
+        "additional_program_false_positives": 19,
+        "batch_inference_ms_per_frame": 0.005379264547052432,
+        "support_vectors": 105
+      },
+      "spatial_141": {
+        "alone": {
+          "tp": 3,
+          "fp": 3,
+          "fn": 4,
+          "tn": 39,
+          "ad_frame_recall": 0.42857142857142855,
+          "precision": 0.5
+        },
+        "combined_same_frame": {
+          "tp": 5,
+          "fp": 3,
+          "fn": 2,
+          "tn": 39,
+          "ad_frame_recall": 0.7142857142857143,
+          "precision": 0.625
+        },
+        "additional_ad_frames": 3,
+        "additional_program_false_positives": 3,
+        "batch_inference_ms_per_frame": 0.0067125704158477635,
+        "support_vectors": 87
+      }
+    },
+    {
+      "held_out": "outdoors",
+      "train_frames": 49,
+      "test_frames": 128,
+      "train_ads": 7,
+      "test_ads": 17,
+      "same_frame_native_baseline": {
+        "tp": 10,
+        "fp": 0,
+        "fn": 7,
+        "tn": 111,
+        "ad_frame_recall": 0.5882352941176471,
+        "precision": 1.0
+      },
+      "flat_fraction": {
+        "alone": {
+          "tp": 5,
+          "fp": 56,
+          "fn": 12,
+          "tn": 55,
+          "ad_frame_recall": 0.29411764705882354,
+          "precision": 0.08196721311475409
+        },
+        "combined_same_frame": {
+          "tp": 12,
+          "fp": 56,
+          "fn": 5,
+          "tn": 55,
+          "ad_frame_recall": 0.7058823529411765,
+          "precision": 0.17647058823529413
+        },
+        "additional_ad_frames": 2,
+        "additional_program_false_positives": 56,
+        "batch_inference_ms_per_frame": 0.0014030001693754457,
+        "support_vectors": 33
+      },
+      "spatial_141": {
+        "alone": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 16,
+          "tn": 111,
+          "ad_frame_recall": 0.058823529411764705,
+          "precision": 1.0
+        },
+        "combined_same_frame": {
+          "tp": 11,
+          "fp": 0,
+          "fn": 6,
+          "tn": 111,
+          "ad_frame_recall": 0.6470588235294118,
+          "precision": 1.0
+        },
+        "additional_ad_frames": 1,
+        "additional_program_false_positives": 0,
+        "batch_inference_ms_per_frame": 0.003091476628469536,
+        "support_vectors": 44
+      }
+    }
+  ],
+  "feature_median_ms_host": 2.96212499961257,
+  "feature_p95_ms_host": 3.235566883813589,
+  "limitations": [
+    "Labels are assistant visual review, not human ground truth.",
+    "Frames selected approximately every20seconds per recorded session; sampling is irregular and neighboring frames may repeat within a test block.",
+    "Split by program/time block because recorded sessions overlap; no random adjacent-frame train/test split.",
+    "One small training ad break; only two evaluation blocks, neither cartoons.",
+    "Baseline is same-frame fresh Samsung verdict or Sponsored hit, not actual blocker effectiveness or its persistent cover state.",
+    "No end-to-end onset latency or false blocks per viewing-hour can be inferred from sparse screenshot labels.",
+    "Experimental141-feature approximation; no author checkpoint, different image resolution/filter/quantization choices, ad-vs-program training rather than paper FMPI target.",
+    "Host timings do not establish TV runtime feasibility.",
+    "No control changes and no persistent trained model exported."
+  ],
+  "native_metadata_audit": {
+    "clean_frames": 1647,
+    "rows_with_ad_reference": 530,
+    "distinct_references": 5,
+    "max_ad_reference_age_seconds": 1152.9079449176788,
+    "player_state_1081_rows": 10,
+    "inserted_ad_active_true_rows": 0,
+    "raw_ordered_adPlaying_event_replay_available": false,
+    "interpretation": "Stored reference/position metadata is not a replay of the ordered fresh onset-event sequence; null active state remains unknown."
+  },
+  "selection_and_labeling": {
+    "selection": "First frame then >=20 seconds per recorded session; deterministic chronological order; no selection using Samsung verdicts",
+    "labels": "Assistant visual review of contact sheets; not human verified; unknowns excluded",
+    "split": "Industry/border-control block versus outdoor-program block; recorded session0 overlaps both, so not used as split key",
+    "forward_test": "Train49 earlier industry/border frames, test128 later outdoor frames",
+    "reverse_test": "Train128 outdoor frames, test49 earlier frames; cross-domain diagnostic, not online incremental learning",
+    "cartoons_present": false
+  },
+  "gate": "Do not deploy: insufficient evidence and cross-program false positives."
+}

@@ -35,3 +35,19 @@ work/
 *.HEIC
 *.jpg
 *.jpeg
+
+# Standalone device provisioning and locally learned model artifacts.
+tv-standalone/app/device.js
+tv-standalone/**/device.json
+tv-standalone/**/appearance.json
+**/control.curl
+**/layout-model.json
+**/layout-enabled
+*.wgt
+*.p12
+*.pfx
+*.key
+*.pem
+*.rgb
+*.nv12
+*.npz
