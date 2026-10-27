@@ -10,6 +10,7 @@ Open **Break screen**, choose a collection and scene, then select **Use this the
 - Seasons: Spring blossom, Summer shore, Autumn amber, Winter stillness.
 - US holidays: New Year, Valentine's Day, Easter morning, Independence Day, Halloween moon, Thanksgiving harvest, Christmas woodland.
 - Zen: Desert quiet, Quiet water, Mist & mountains.
+- City skylines: Raleigh, Memphis, Washington DC, and Charlotte, each in Day and Night.
 
 These are still geometric scenes rendered locally with the existing EFL overlay primitives. No cloud artwork, animation, image download, or new inference service is required. Themes are selected manually; there is no automatic calendar switching. Browser previews approximate SamsungOne typography and must be checked on-device before release.
 
@@ -63,3 +64,13 @@ Private packaging must preserve `device.js` from the prior signed package or gen
 The renderer remains alive in standby between breaks. The engine now retires a stale renderer before starting a new break when its loaded theme differs from the saved effective theme. Saving during an active break keeps that card stable; the next break uses the new scene. Unchanged themes retain the warm process.
 
 `dotnet run --project tv-standalone/tests/theme-lifecycle/LifecycleTests.csproj -- tv-standalone/engine` exercises the engine helper with a real temporary child process, without accessing TV services: unchanged renderer stays alive, active cover stays alive after selection changes, idle stale renderer exits, and saved settings survive.
+
+### v0.4.0: city silhouettes and clock-only custom artwork
+
+All custom scenes specify `infoMode: "clock"`. The native renderer shows only the time of day in the upper-right, without program metadata, reassurance text, break counters, elapsed time or daily totals over the art. Original retains its prior information layout. The browser preview draws the same clock placement; day/night versions are manually selected.
+
+The 23-theme catalog includes eight original vector city compositions. `scripts/skyline-art.py` defines each city's landmark geometry and paired palettes, called by `build-themes.py`. Skyline geometry stays below the central typography. Raleigh uses PNC's offset spire and Wells Fargo's terraced crown; Memphis uses the Pyramid and Hernando de Soto Bridge; DC uses the Capitol, Washington Monument and Lincoln Memorial; Charlotte uses Corporate Center's crown and 550 South Tryon's angular cutout. These are stylized landmark compositions, not surveyed silhouettes or literal views from one location.
+
+Architectural references were studied, not bundled or traced as raster assets: [Raleigh photograph](https://raleighskyline.com/2015/downtown-raleigh-in-the-spring-2015/3340/raleigh-aerial-of-pnc-plaza/), [Charlotte office photograph](https://www.parkerpoe.com/offices/charlotte), [Memphis tourism](https://www.memphistravel.com/neighborhoods/downtown), [DC landmark view-plane study](https://planning.dc.gov/am/page/capital-landmarks-view-plane-study).
+
+Updating existing custom scenes to clock-only requires both the generated JSON and the rebuilt native overlay. A controller-only update cannot hide native stats. The coordinated v0.4.0 deployment preserves private configuration and the saved theme; it includes the engine allowlist, renderer, theme JSON and signed controller.

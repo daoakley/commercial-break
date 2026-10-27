@@ -19,7 +19,13 @@
       else if(o.type==='polygon') { o.points.forEach(function(p,i){if(i)c.lineTo(p.x,p.y);else c.moveTo(p.x,p.y);});c.closePath();c.fill(); }
       else if(o.type==='line') { c.moveTo(o.x1,o.y1);c.lineTo(o.x2,o.y2);c.lineWidth=1.5;c.stroke(); }
       else if(o.type==='textblock') { c.font='400 '+o.size+'px SamsungOne, Arial, sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(o.text,o.x+o.width/2,o.y+o.height/2,o.width); }
-    }); c.restore();
+    });
+    if(scene.infoMode==='clock') {
+      var now=new Date(),hour=now.getHours();
+      c.fillStyle='#D8DEDA';c.font='400 36px SamsungOne, Arial, sans-serif';c.textAlign='right';c.textBaseline='top';
+      c.fillText((hour%12||12)+':'+('0'+now.getMinutes()).slice(-2)+' '+(hour<12?'AM':'PM'),1800,76);
+    }
+    c.restore();
   }
   function notify(message) { el('appearance-note').textContent=message; }
   function request(path, body, done) {
@@ -47,7 +53,7 @@
     });
     Array.prototype.forEach.call(el('appearance-groups').children,function(b){b.setAttribute('aria-selected',String(b.textContent===group));});
   }
-  ['Original','Seasons','US holidays','Zen'].forEach(function(name){var b=document.createElement('button');b.textContent=name;b.setAttribute('role','tab');b.onclick=function(){group=name;render();};el('appearance-groups').appendChild(b);});
+  ['Original','Seasons','US holidays','Zen','City skylines'].forEach(function(name){var b=document.createElement('button');b.textContent=name;b.setAttribute('role','tab');b.onclick=function(){group=name;render();};el('appearance-groups').appendChild(b);});
   function close() { if(busy)return;panel.hidden=true;var main=document.querySelector('main');if(main)main.removeAttribute('aria-hidden');if(opener)opener.focus(); }
   function open() {
     opener=document.activeElement;selected=saved;group=byId(selected).category;panel.hidden=false;var main=document.querySelector('main');if(main)main.setAttribute('aria-hidden','true');
@@ -75,6 +81,7 @@
       var d=Math.abs(forward)+Math.abs(side)*2;if(d<distance){best=b;distance=d;}
     });if(best){best.focus();best.scrollIntoView({block:'nearest'});}
   },true);
+  setInterval(function(){if(!panel.hidden)draw(el('appearance-preview'),byId(selected).scene);},30000);
   window.CBAppearance={open:open,draw:draw};
   if(el('appearance-open'))el('appearance-open').onclick=open;
   if(previewOnly){open();el('appearance-close').textContent='Back to preview';}

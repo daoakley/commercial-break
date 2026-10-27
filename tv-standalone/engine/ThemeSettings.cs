@@ -9,7 +9,9 @@ public sealed class ThemeSettings {
  readonly HashSet<string> allowed = new HashSet<string> {
   "default", "spring", "summer", "autumn", "winter", "christmas", "valentines",
   "new-year", "independence", "halloween", "thanksgiving", "easter",
-  "zen-dunes", "zen-water", "zen-mountains"
+  "zen-dunes", "zen-water", "zen-mountains",
+  "raleigh-day", "raleigh-night", "memphis-day", "memphis-night",
+  "dc-day", "dc-night", "charlotte-day", "charlotte-night"
  };
  public string Selected { get; private set; } = "default";
  public ThemeSettings(string home) {

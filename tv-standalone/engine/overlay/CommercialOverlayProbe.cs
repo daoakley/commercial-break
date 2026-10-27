@@ -762,6 +762,7 @@ internal static class CommercialOverlayProbe
         private readonly Dictionary<string, IntPtr> infoText = new Dictionary<string, IntPtr>();
         private readonly List<IntPtr> timelineBars = new List<IntPtr>();
         private bool infoBuilt;
+        private string infoMode = "full";
         private readonly Dictionary<string, int[]> textBoxes = new Dictionary<string, int[]>();
 
         internal void HideInfo()
@@ -835,6 +836,19 @@ internal static class CommercialOverlayProbe
         // detector's per-show statistics, timeline and predictions are not shown.
         internal void UpdatePanel(JsonElement root, bool hasRoot, BreakTracker tracker)
         {
+            if (infoMode == "clock")
+            {
+                // Custom artwork: one quiet clock, with no counters, captions,
+                // show metadata or bottom stats panel covering the silhouette.
+                if (!infoBuilt)
+                {
+                    InfoText("clock", 1800, 76, 36, "", new Rgba(216, 222, 218, 255), 0, 1);
+                    infoBuilt = true;
+                }
+                foreach (IntPtr obj in infoObjects) Show(obj);
+                SetInfoText("clock", DateTime.Now.ToString("h:mm tt", CultureInfo.InvariantCulture));
+                return;
+            }
             Rgba white = new Rgba(235, 241, 242, 255);
             Rgba muted = new Rgba(140, 156, 170, 255);
             Rgba dim = new Rgba(94, 107, 120, 255);
@@ -926,6 +940,13 @@ internal static class CommercialOverlayProbe
                     || objects.ValueKind != JsonValueKind.Array)
                 {
                     throw new InvalidDataException("scene root must contain an objects array");
+                }
+
+                if (root.TryGetProperty("infoMode", out JsonElement mode))
+                {
+                    if (mode.ValueKind != JsonValueKind.String || (mode.GetString() != "clock" && mode.GetString() != "full"))
+                        throw new InvalidDataException("Unknown scene information mode");
+                    infoMode = mode.GetString();
                 }
 
                 int count = objects.GetArrayLength();
