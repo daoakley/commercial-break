@@ -1,11 +1,11 @@
 (function () {
   'use strict';
-  var themes = window.CommercialBreakThemes, selected = 'default', saved = 'default', group = 'Original', busy = false;
+  var themes = window.CommercialBreakThemes, selected = 'default', saved = 'default', group = 'Original', busy = false, previewCity = 0;
   var previewOnly = window.CB_THEME_PREVIEW === true, opener = null;
   var panel = document.createElement('section');
   panel.id = 'appearance-panel'; panel.hidden = true; panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'appearance-title');
-  panel.innerHTML = '<div class="appearance-shell"><header class="appearance-header"><div><p class="appearance-eyebrow">COMMERCIAL BREAK / APPEARANCE</p><h1 id="appearance-title">Make the break yours.</h1><p class="appearance-subtitle">A little stillness, in your own style.</p></div><button id="appearance-close" class="appearance-secondary">Close <span aria-hidden="true">×</span></button></header><div class="appearance-layout"><div class="appearance-feature"><div class="appearance-canvas-wrap"><canvas id="appearance-preview" width="1920" height="1080" role="img" aria-label="Break screen preview"></canvas><span class="appearance-preview-tag">PREVIEW</span></div><div class="appearance-caption"><div><p id="appearance-category"></p><h2 id="appearance-name"></h2><p id="appearance-description"></p></div><span class="appearance-still">Still scene · On your TV</span></div><p id="appearance-note" aria-live="polite"></p></div><div class="appearance-library"><div id="appearance-groups" role="tablist" aria-label="Theme collections"></div><div id="appearance-options" role="group" aria-label="Themes"></div></div></div><footer class="appearance-footer"><div><span class="appearance-dot"></span><span id="appearance-saved">Original is your current theme</span><p>The show keeps playing. Your choice appears on the next break.</p></div><div class="appearance-actions"><button id="appearance-original" class="appearance-secondary">Keep Original</button><button id="appearance-save">Use this theme <span aria-hidden="true">↗</span></button></div></footer></div>';
+  panel.innerHTML = '<div class="appearance-shell"><header class="appearance-header"><div><p class="appearance-eyebrow">COMMERCIAL BREAK / APPEARANCE</p><h1 id="appearance-title">Make the break yours.</h1><p class="appearance-subtitle">A little stillness, in your own style.</p></div><button id="appearance-close" class="appearance-secondary">Close <span aria-hidden="true">×</span></button></header><div class="appearance-layout"><div class="appearance-feature"><div class="appearance-canvas-wrap"><canvas id="appearance-preview" width="1920" height="1080" role="img" aria-label="Break screen preview"></canvas><span class="appearance-preview-tag">PREVIEW</span></div><div class="appearance-caption"><div><p id="appearance-category"></p><h2 id="appearance-name"></h2><p id="appearance-description"></p><button id="appearance-next-city" class="appearance-secondary" hidden>Preview next city</button></div><span class="appearance-still">Still scene · On your TV</span></div><p id="appearance-note" aria-live="polite"></p></div><div class="appearance-library"><div id="appearance-groups" role="tablist" aria-label="Theme collections"></div><div id="appearance-options" role="group" aria-label="Themes"></div></div></div><footer class="appearance-footer"><div><span class="appearance-dot"></span><span id="appearance-saved">Original is your current theme</span><p>The show keeps playing. Your choice appears on the next break.</p></div><div class="appearance-actions"><button id="appearance-original" class="appearance-secondary">Keep Original</button><button id="appearance-save">Use this theme <span aria-hidden="true">↗</span></button></div></footer></div>';
   document.body.appendChild(panel);
   function el(id) { return document.getElementById(id); }
   function byId(id) { for (var i=0;i<themes.length;i++) if (themes[i].id===id) return themes[i]; return themes[0]; }
@@ -38,9 +38,11 @@
     x.send(body?JSON.stringify(body):null);
   }
   function render() {
-    var t=byId(selected);draw(el('appearance-preview'),t.scene);
-    el('appearance-name').textContent=t.name;el('appearance-category').textContent=t.category.toUpperCase();el('appearance-description').textContent=t.description;
-    el('appearance-preview').setAttribute('aria-label',t.name+' — '+t.description);
+    var t=byId(selected),shown=t.rotation?byId(t.rotation[previewCity%t.rotation.length]):t;draw(el('appearance-preview'),shown.scene);
+    el('appearance-next-city').hidden=!t.rotation;
+    el('appearance-next-city').textContent=t.rotation?'Preview next city · '+byId(t.rotation[(previewCity+1)%t.rotation.length]).name:'Preview next city';
+    el('appearance-name').textContent=t.name;el('appearance-category').textContent=t.category.toUpperCase();el('appearance-description').textContent=t.description+(t.rotation?' Previewing '+shown.name+'.':'');
+    el('appearance-preview').setAttribute('aria-label',shown.name+' — '+t.description);
     el('appearance-saved').textContent=byId(saved).name+' is your current theme';
     el('appearance-save').disabled=busy;
     var options=el('appearance-options');options.innerHTML='';
@@ -49,7 +51,7 @@
       var canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;canvas.setAttribute('aria-hidden','true');b.appendChild(canvas);draw(canvas,x.scene);
       var label=document.createElement('span');label.textContent=x.name;b.appendChild(label);
       var check=document.createElement('i');check.textContent=x.id===selected?'✓':'';check.setAttribute('aria-hidden','true');b.appendChild(check);
-      b.onclick=function(){selected=x.id;notify(previewOnly?'Design preview only. The TV is unchanged.':'Previewing '+x.name+'. Select “Use this theme” to save.');render();panel.querySelector('[data-theme="'+x.id+'"]').focus();};options.appendChild(b);
+      b.onclick=function(){selected=x.id;previewCity=0;notify(previewOnly?'Design preview only. The TV is unchanged.':'Previewing '+x.name+'. Select “Use this theme” to save.');render();panel.querySelector('[data-theme="'+x.id+'"]').focus();};options.appendChild(b);
     });
     Array.prototype.forEach.call(el('appearance-groups').children,function(b){b.setAttribute('aria-selected',String(b.textContent===group));});
   }
@@ -60,6 +62,7 @@
     notify(previewOnly?'Design preview only. Nothing here changes your TV.':'Loading your saved appearance…');render();el('appearance-close').focus();
     request('status',null,function(error,s){if(panel.hidden)return;if(error){notify(error.message);return;}saved=byId(s.appearance&&s.appearance.theme||'default').id;selected=saved;group=byId(saved).category;render();notify(previewOnly?'Design preview only. Nothing here changes your TV.':'Your current graphic stays in place until you save a new choice.');});
   }
+  el('appearance-next-city').onclick=function(){previewCity++;render();el('appearance-next-city').focus();};
   el('appearance-close').onclick=close;
   el('appearance-original').onclick=function(){selected='default';group='Original';render();notify('Original preview. Select “Use this theme” to restore it.');};
   el('appearance-save').onclick=function(){if(busy)return;busy=true;el('appearance-save').disabled=true;var choice=selected;
@@ -81,7 +84,7 @@
       var d=Math.abs(forward)+Math.abs(side)*2;if(d<distance){best=b;distance=d;}
     });if(best){best.focus();best.scrollIntoView({block:'nearest'});}
   },true);
-  setInterval(function(){if(!panel.hidden)draw(el('appearance-preview'),byId(selected).scene);},30000);
+  setInterval(function(){if(!panel.hidden){var t=byId(selected);draw(el('appearance-preview'),t.rotation?byId(t.rotation[previewCity%t.rotation.length]).scene:t.scene);}},30000);
   window.CBAppearance={open:open,draw:draw};
   if(el('appearance-open'))el('appearance-open').onclick=open;
   if(previewOnly){open();el('appearance-close').textContent='Back to preview';}
