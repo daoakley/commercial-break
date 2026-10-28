@@ -115,7 +115,15 @@ Ads can still be missed, and an experimental detector can misidentify a show.
 No measured detection-accuracy guarantee is established. Timing and compatibility vary
 with firmware, capture availability and the recognition service. Report concrete
 failures through the [issue tracker](https://github.com/daoakley/commercial-break/issues)
-without posting private captures or credentials.
+without posting private captures or credentials. Include the source revision,
+TV model/firmware, reproduction steps and a redacted error summary. Do not upload
+signed widgets, raw status dumps, viewing history or device-specific build bundles.
+
+Commercial Break is an independent project, not affiliated with or endorsed by
+Samsung, YouTube or Google. The project license covers the included source; it
+does not grant rights to third-party firmware or access to recognition services.
+The documented setup uses the owner's compatible TV and its existing service
+configuration.
 
 ## License
 

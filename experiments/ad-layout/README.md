@@ -1,6 +1,6 @@
 # Offline advertising-layout test
 
-Research hypothesis: a compact spatial classifier can recognize advertising presentation without memorizing individual ads. This test leaves all TV controls and running collectors unchanged. It is **not ready for deployment**.
+Research hypothesis: a compact spatial classifier can recognize advertising presentation without memorizing individual ads. This document reports an offline evaluation. The separate, opt-in [TV pilot](../../tv-standalone/EXPERIMENTAL_LAYOUT.md) implements a fixed candidate with limited validation; it is not enabled by default.
 
 ## What ran
 
@@ -20,7 +20,7 @@ Research hypothesis: a compact spatial classifier can recognize advertising pres
 
 Across the two diagnostic folds, the same-frame native baseline identified 12 of 24 reviewed ad frames. Adding the spatial classifier identified 16, while falsely flagging 3 of 153 program frames. The spatial classifier alone identified only 4 of 24 ad frames. **These are sparse, assistant-reviewed frame results, not commercial-break recall, onset timing, or a 70-to 90% effectiveness improvement.**
 
-The false positives were industrial program imagery. The feature extractor took a median 2.96 ms and p 953.24 ms on the development Mac; batched classifier evaluation was below 0.01 ms/frame. These results do not establish Tizen runtime support or TV performance. The extraction uses OpenCV; no TV port or model was deployed.
+The false positives were industrial program imagery. The feature extractor took a median 2.96 ms and p95 of 3.24 ms on the development Mac; batched classifier evaluation was below 0.01 ms/frame. These results do not establish Tizen runtime support or TV performance. The extraction uses OpenCV. These measurements describe the offline experiment; separate TV pilot measurements are linked below.
 
 The forward test trains on only 7 ad frames. The reverse diagnostic trains on 17. Both are too small to settle the method's potential. No cartoons were present. Snowy program frames, subtitles, program photo inserts, graphics and product bottles were represented, but broad sports/news coverage was absent.
 
@@ -48,15 +48,15 @@ Evaluation refuses expired evidence and exports no trained model. It writes a pr
 
 ## Decision
 
-Do not add these classifications to blocking. The test demonstrates a small complementary signal, poor cross-program transfer with the limited training set, and severe failure of flat-color-only classification. Further evaluation needs representative independently checked labels—including cartoons—and a genuinely held-out sequence with real ad boundaries before any performance or deployment claim.
+These results alone do not justify enabling these classifications for general blocking. The test demonstrates a small complementary signal, poor cross-program transfer with the limited training set, and severe failure of flat-color-only classification. Further evaluation needs representative independently checked labels—including cartoons—and a genuinely held-out sequence with real ad boundaries before any performance or deployment claim.
 
 
 ## Follow-up: isolate the strongest matches
 
 A same-sample diagnostic swept fixed SVM decision-margin cutoffs of 0,0.1,0.25,0.5,0.75 and 1.0. At 0.5, three extra ad frames remained and all three previously observed program false positives disappeared. Combined same-frame detections rose from 12 to 15 of 24 ad frames, a 25% relative increase (12.5 percentage points in sampled-frame recall). There were zero flags on 153 reviewed program frames at that cutoff. In the forward-only fold, the gain remained one ad frame.
 
-**This cutoff was selected after inspecting the same data, so this is development evidence, not independent validation.** An SVM margin of 0.5 is not a 50% probability. The candidate for a fresh-data test is now fixed at 0.5; it must be evaluated without further tuning on that new test set. The original deployment gate remains closed. This result does not demonstrate a 10% improvement in live blocking, cartoon safety, onset latency, or on-TV runtime feasibility. See `cutoff-results-2026-10-27.json` for every cutoff, including those that discarded all gains.
+**This cutoff was selected after inspecting the same data, so this is development evidence, not independent validation.** An SVM margin of 0.5 is not a 50% probability. The candidate for a fresh-data test is now fixed at 0.5; it must be evaluated without further tuning on that new test set. Independent accuracy validation remains outstanding. This result does not demonstrate a 10% improvement in live blocking, cartoon safety, onset latency, or on-TV runtime feasibility. See `cutoff-results-2026-10-27.json` for every cutoff, including those that discarded all gains.
 
-## Explicitly authorized TV pilot
+## Optional TV pilot
 
-On October 27 the owner requested a separately switchable live trial despite the evaluation limits above. See [the pilot implementation and off switch](../../tv-standalone/EXPERIMENTAL_LAYOUT.md) and `tv-pilot-results-2026-10-27.json`. The fixed forward model is experimental; this authorization does not convert exploratory scores into validated live performance.
+A separately switchable implementation is documented in [the pilot guide](../../tv-standalone/EXPERIMENTAL_LAYOUT.md), with runtime measurements in `tv-pilot-results-2026-10-27.json`. It uses the fixed forward model and remains experimental. Successful execution on the TV does not establish general detection accuracy.

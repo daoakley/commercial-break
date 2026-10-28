@@ -1,5 +1,4 @@
 {
-  "checked_unix": 1793067996.8301172,
   "lab_tests_passed": 35,
   "dashboard_tests_passed": 47,
   "native_connected": true,
@@ -72,8 +71,7 @@
         "mean": 0.03717585214156103
       },
       "method": "Single pass, actual retained clean images, CPU wall clock. File I/O and Pillow decoding excluded. Feature extraction measured separately; detector includes its own extraction and direct NumPy badge scoring when applicable. No PNG encode/decode in compute path. Optional reference equivalence audit excluded from timings. Do not add the separate timing groups. No warmup removal, no GPU/TV inference claim."
-    },
-    "expires_unix": 1793238257.869
+    }
   },
   "baseline_compute_p95_ms": 36.94563340977765,
   "accuracy_validated": false,
