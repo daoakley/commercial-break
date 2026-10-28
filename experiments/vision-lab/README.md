@@ -2,7 +2,7 @@
 
 An observation-only Docker side project for testing inexpensive commercial detection against the TV's existing captures and native evidence. It has no mute, overlay, remote-control or Samsung-recognition client. The standalone TV app continues blocking independently, including when the computer is unavailable.
 
-Agreed learning paths and implementation status: [roadmap](../../docs/LOCAL-LEARNING-ROADMAP.md), tracked in [issue #8](https://github.com/daoakley/commercial-break/issues/8).
+Research paths and implementation status: [roadmap](../../docs/LOCAL-LEARNING-ROADMAP.md), tracked in [issue #8](https://github.com/daoakley/commercial-break/issues/8).
 
 ## Data path
 

@@ -1,6 +1,6 @@
 # Native-first local commercial detection
 
-Updated 2026-10-27. This is the agreed research plan, not a claim that the planned features are already active. Priority: use a verified native answer when available; otherwise make a small, local visual decision using current TV context. The current TV blocker remains independent of the observation-only lab.
+Updated 2026-10-27. This is the research plan, not a claim that the planned features are already active. Priority: use a verified native answer when available; otherwise make a small, local visual decision using current TV context. The current TV blocker remains independent of the observation-only lab.
 
 GitHub tracking: [issue #8](https://github.com/daoakley/commercial-break/issues/8). Update the issue and this register together as each path progresses.
 
