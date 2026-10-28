@@ -15,7 +15,7 @@
   function render(error, s) {
     if (error) {
       el('status').textContent = 'TV engine unavailable';
-      el('detail').textContent = 'The app is installed. Its privileged engine needs restarting after a TV reboot.';
+      el('detail').textContent = 'Engine unavailable. Allow up to 90 seconds after boot, then check the separate Recovery service.';
       el('enable').disabled = el('disable').disabled = el('debug-toggle').disabled = true;
       el('debug-detail').textContent = 'Debug status unavailable. A saved 48-hour deadline is checked when the engine restarts.';
       return;
