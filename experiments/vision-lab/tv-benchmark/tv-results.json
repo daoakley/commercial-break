@@ -267,42 +267,6 @@
       "weights_loaded": false,
       "inference_attempted": false,
       "caveat": "Graph acceptance does not establish weight or numerical compatibility. A nonzero return establishes graph-load failure; inspect native diagnostics for its cause."
-    },
-    {
-      "enabled": true,
-      "covered": true,
-      "otherActive": false,
-      "message": "Commercial matched",
-      "stage": "capture",
-      "lastError": "",
-      "lastAcceptedAt": 1793073705136,
-      "covers": 2,
-      "captureMode": "card-visible",
-      "steadyCardMatches": 22,
-      "maskedFallbacks": 1,
-      "queries": 26,
-      "matches": 25,
-      "engine": "Samsung recognition only",
-      "releaseSeconds": 8,
-      "persistentApp": true,
-      "rebootReady": false,
-      "appearance": {
-        "theme": "winter",
-        "effectiveTheme": "winter",
-        "activeTheme": "default"
-      },
-      "debug": {
-        "enabled": true,
-        "startedAt": 1793065457869,
-        "expiresAt": 1793238257869,
-        "remainingSeconds": 164549,
-        "records": 736,
-        "bytes": 134071342,
-        "maxBytes": 134217728,
-        "evictedRecords": 6,
-        "message": "Recording; oldest records removed at storage limit",
-        "error": ""
-      }
     }
   ],
   "cleanup": {
