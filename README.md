@@ -13,8 +13,10 @@ the enabled engine running.
 **Experimental, tested on one TV:** 2022 Samsung Frame QN65LS03BAFXZA,
 firmware T-PTMAKUC-1720.7, Tizen 6.5, .NET Core 3.1. This is source for a manually
 provisioned installation, not a Samsung Store app or a universal installer.
-The controller stays installed after reboot, but the temporary privileged
-engine currently needs restarting. Reboot persistence is not solved.
+The optional signed recovery widget starts after a full reboot, reacquires
+root through TV-local SDB and starts the existing engine. A power-cycle test on
+the listed model confirmed automatic startup and resumed recognition; allow
+roughly 90 seconds for startup. Other hardware/firmware remain unverified.
 
 ## How it works
 
@@ -53,12 +55,11 @@ Running on the TV does **not** mean entirely offline: the Samsung path sends
 fingerprints and device metadata to Samsung. The local checks need no remote
 AI service. This app does not disable Samsung tracking.
 
-## The TV app and new break-screen design
+## TV controls and break screens
 
 Open **Commercial Break → Break screen** to preview and choose a theme. There
 are 23 choices: Original; seasonal, holiday and zen scenes; and day/night
-skyline scenes for Raleigh, Memphis, Washington DC and Charlotte. The current
-Raleigh design includes the revised landmark silhouettes and wooded foreground.
+skyline scenes for Raleigh, Memphis, Washington DC and Charlotte. The Raleigh design includes landmark silhouettes and wooded foreground.
 
 Custom artwork uses a minimal clock in the upper-right. It is rendered locally
 with geometric primitives, with no artwork download or animation service.
@@ -76,8 +77,9 @@ not load TV credentials or contact the TV; Save is simulated.
 
 ## Source and reproduction
 
-Start with the [standalone app guide](tv-standalone/README.md) for build commands,
-component layout, deployment prerequisites, appearance controls and tests.
+Start with the [installation guide](tv-standalone/INSTALL.md) for private inputs,
+building/signing, deployment, reboot recovery, validation and removal. The
+[app guide](tv-standalone/README.md) covers controls, themes and maintenance.
 
 | Component | Source |
 | --- | --- |
@@ -86,12 +88,14 @@ component layout, deployment prerequisites, appearance controls and tests.
 | Capture, Sponsored check and local classifier | [`engine/capture`](tv-standalone/engine/capture) |
 | Native card renderer | [`engine/overlay`](tv-standalone/engine/overlay) |
 | Theme generators and watchdog | [`tv-standalone/scripts`](tv-standalone/scripts) |
+| Automatic root and engine startup | [`tv-standalone/recovery`](tv-standalone/recovery) |
+| Private bundle builder and management CLI | [`tv-standalone/tools`](tv-standalone/tools) |
 | Tests | [`tv-standalone/tests`](tv-standalone/tests) |
 
 Additional details: [Sponsored detection](tv-standalone/SPONSORED_PILL.md),
 [experimental layout detector and off switch](tv-standalone/EXPERIMENTAL_LAYOUT.md).
-The [computer-assisted guide](COMPUTER_ASSISTED.md) documents the earlier
-Docker/Claude implementation retained at the repository root. Research under
+The [computer-assisted guide](COMPUTER_ASSISTED.md) documents the optional
+Docker/Claude implementation at the repository root. Research under
 [`experiments`](experiments) is separate from the deployed app and is not a
 promise of production accuracy.
 
@@ -108,7 +112,7 @@ are excluded from this repository. Supply your own authorized device setup.
 There is no bundled credential that makes Samsung recognition work on other TVs.
 
 Ads can still be missed, and an experimental detector can misidentify a show.
-No 90%, 99%, or tenfold improvement is established. Timing and compatibility vary
+No measured detection-accuracy guarantee is established. Timing and compatibility vary
 with firmware, capture availability and the recognition service. Report concrete
 failures through the [issue tracker](https://github.com/daoakley/commercial-break/issues)
 without posting private captures or credentials.
