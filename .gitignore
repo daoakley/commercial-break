@@ -51,3 +51,11 @@ tv-standalone/**/appearance.json
 *.rgb
 *.nv12
 *.npz
+
+# Private recovery and packaging inputs.
+**/private-config.json
+**/recovery-token
+**/password.txt
+**/certificates/
+**/*.sqlite
+**/engine.tar.gz

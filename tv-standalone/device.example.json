@@ -1,0 +1,14 @@
+{
+  "identity": {
+    "psid": "REPLACE_WITH_YOUR_TV_PSID",
+    "vdvendorcode": "REPLACE_WITH_YOUR_TV_VENDOR_CODE",
+    "modelID": "REPLACE_WITH_YOUR_TV_ACR_MODEL_ID",
+    "sourceInfo": "REPLACE_WITH_YOUR_TV_NUMERIC_SOURCE"
+  },
+  "parameters": {
+    "api": 2,
+    "zipcode": "REPLACE_WITH_YOUR_TV_REGION_VALUE",
+    "firmware": "REPLACE_WITH_YOUR_TV_ACR_FIRMWARE_VALUE",
+    "modelID": "REPLACE_WITH_YOUR_TV_ACR_MODEL_ID"
+  }
+}

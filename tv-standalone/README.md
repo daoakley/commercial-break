@@ -11,8 +11,9 @@ Samsung recognition still uses Samsung's network service.
 
 The installed **Commercial Break** app provides **On**, **Off**, **Start debug
 recording**, and **Break screen** controls. Closing the controller leaves an
-enabled background engine running. A TV reboot currently requires restarting
-the privileged engine; the installed app alone cannot restore that access.
+enabled background engine running. The optional [boot recovery widget](recovery/README.md) restores privileged
+access and restarts the engine after a full reboot. The controller alone does
+not provide boot recovery.
 
 Open **Break screen**, choose a collection and scene, then select **Use this
 theme**. Browsing previews does not save. **Keep Original** previews the original
@@ -33,7 +34,7 @@ The 23 choices are:
 Custom scenes show only the clock in the upper-right, with no program metadata
 or break statistics over the artwork. Original retains its original information
 layout. Day/night and holiday choices are manual, not calendar-driven.
-The current Raleigh scenes use revised PNC and Wells Fargo silhouettes and a
+The Raleigh scenes use PNC and Wells Fargo silhouettes and a
 wooded foreground. Artwork consists of original geometric compositions rendered
 locally with EFL primitives; no downloaded art or animation service is needed.
 
@@ -66,51 +67,23 @@ the controller and renderer need them at runtime. `scripts/build-themes.py` and
 `scripts/skyline-art.py` are their editable sources. Do not edit generated assets
 independently. `engine/scene.json` is the original graphic's source of truth.
 
-## Provisioning and deployment
+## Installation and recovery
 
-This is not a complete redistributable installer. A fresh device needs a working
-[samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root) temporary root
-route, a compatible `sdb`, the tested TV runtime/native APIs, Samsung recognition
-configuration from that authorized device, and a signed Tizen controller package.
-An ordinary app certificate does not grant the engine's capture privileges.
+Follow [INSTALL.md](INSTALL.md) for prerequisites, private configuration, building
+and signing both widgets, engine deployment, automatic boot setup, validation,
+updates and removal. The build tool requires the owner's native capture library
+and Samsung recognition configuration. It refuses an unrecognized library hash.
+No signing keys, device identities, proprietary binaries or private layout model
+are included.
 
-For an existing compatible installation:
+The main controller, engine and helpers must come from the same source revision.
+The visible name is **Commercial Break**; existing internal names and app IDs
+are retained for upgrade compatibility. The optional experimental layout model
+is not required for Samsung/Sponsored operation.
 
-1. Back up its engine/helper files and preserve its private configuration,
-   selected appearance, enabled state and original debug expiry.
-2. Build and stage the engine, capture helper, navigation observer and renderer
-   with their runtime configuration files under the engine's configured home:
-   `/opt/usr/home/owner/commercial-block`.
-3. Include `scene.json`, the generated `themes/` directory and `scripts/watchdog.sh`.
-   The renderer needs the coordinated clock-only update; replacing only the UI
-   cannot hide its old information fields.
-4. Package the controller from `app/`, including the generated `themes.js`,
-   `appearance.js`, and `appearance.css`, with your signing profile, icon and
-   private `device.js`. The latter supplies `window.COMMERCIAL_BLOCK_TOKEN`,
-   matching the engine's private `device.json` control token. Neither file nor
-   signing material belongs in Git. Retain the existing app identity when
-   updating an installed controller.
-5. Replace components together, restart only the blocker and its helpers, restore
-   the previous enabled state, and inspect the authenticated `/status` response.
-   Do not reset debug to obtain a fresh deadline. Verify navigation, appearance,
-   a normal ad break and return to programming on the actual TV.
-
-Device-specific recognition credentials, native Samsung libraries, private
-control files, signing material, icon assets and trained layout weights are not
-bundled. The optional layout model is not required for Samsung/Sponsored
-operation. Source publication does not provide credentials or guarantee that
-other firmware can be provisioned through the same path.
-
-The controller manifest currently describes version 0.4.0. Internal names such
-as `CommercialBlock.dll` remain for installation compatibility; the visible app
-name is **Commercial Break**.
-
-## Crash recovery
-
-The on-TV engine now has [bounded private crash logs and a local recovery
-supervisor](RECOVERY.md). It restarts after process exits, stalled detection or
-repeated recognition failures while preserving your On/Off setting. Full reboot
-recovery still requires temporary privileged access.
+[Crash recovery](RECOVERY.md) handles process exits, stalled detection and
+repeated exceptions. The separate [boot recovery service](recovery/README.md)
+reacquires root after power loss and preserves the main app's On/Off setting.
 
 ## Runtime controls and maintenance
 

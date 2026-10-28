@@ -1,7 +1,7 @@
 # Crash diagnostics and automatic recovery
 
-The TV engine is supervised locally by a runtime systemd service. No computer,
-LLM or new network endpoint is involved in health checks or recovery. Samsung
+The TV engine is supervised locally by a runtime systemd service. No computer or LLM is involved in engine health checks or process recovery.
+The optional boot-recovery widget has its own authenticated LAN endpoint. Samsung
 recognition still requires its existing network service.
 
 ## What recovers
@@ -64,7 +64,6 @@ values, viewing titles or device identity. They are separate from 48-hour debug
 recordings; debug expiry/deletion behavior is unchanged. Logs remain as a bounded
 rolling history when debug recording stops. Do not publish raw device logs.
 An exit status of 137 indicates a kill signal; it is not by itself proof of OOM.
-The pre-supervision engine's historical exit cause cannot be reconstructed.
 
 The authenticated `/status` response adds `health` with current engine PID,
 start time, loop progress and supervisor information. `systemctl show
@@ -102,10 +101,10 @@ both backed-up DLLs, remove the runtime unit and reload systemd. Then use the
 previous documented launch procedure and explicitly restore the previous
 On/Off choice; older engines reset it during startup.
 
-**A full TV reboot still requires restoring temporary privileged access and
-starting the runtime service again.** The unit is intentionally installed in
-`/run/systemd/system`, without an enable-at-boot step. This change does not add a
-persistent root exploit or solve reboot recovery.
+The runtime unit disappears at reboot. The optional
+[boot-recovery widget](recovery/README.md) reacquires root, recreates the unit and
+starts the engine automatically. Without that widget, the engine still needs a
+privileged restart after a full boot.
 
 ## Validation
 
@@ -122,13 +121,10 @@ Sponsored-pill and layout-evidence tests must also pass. Live TV validation must
 check fresh recognition after restart and unchanged saved settings; off-device
 tests alone do not prove native API access from a system service.
 
-### Tested on the 2022 Frame, 2026-10-27
+### Validated target behavior
 
-The service started successfully under the TV's system manager and performed
-native captures and Samsung recognition. A controlled SIGKILL of the engine was
-recorded with status 137; a replacement engine started about five seconds after
-the recorded exit. The subsequent check showed an active service, four fresh
-Samsung queries, local preprocessing and no current error. Enabled state,
-appearance, layout toggle and the original debug expiry were preserved. The
-historical overnight failure remains unexplained; the new logs apply to future
-failures. Full TV reboot and OS-wide failure recovery were not tested or solved.
+On QN65LS03BAFXZA / T-PTMAKUC-1720.7, the service performs native captures and
+recognition, preserves saved settings, and replaces a SIGKILLed engine in about
+five seconds. With the separate recovery widget, one full power-cycle test also
+confirmed unattended root reacquisition, engine startup and subsequent captures
+and recognition. Compatibility and timing on other firmware remain unverified.
