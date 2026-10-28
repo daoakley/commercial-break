@@ -1,0 +1,33 @@
+name: TV source checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - run: pip install -r tv-standalone/tools/requirements.txt
+      - run: node tv-standalone/recovery/tests/recovery.test.cjs
+      - run: node tv-standalone/tests/test_debug_ui.js
+      - run: python tv-standalone/tests/test_build_bundle.py
+      - run: python tv-standalone/tests/test_themes.py
+      - run: python tv-standalone/tests/test_supervisor.py
+      - name: Build TV components and root payloads
+        run: |
+          for project in tv-standalone/engine/CommercialBlock.csproj tv-standalone/engine/capture/AcrFrameProbe.csproj tv-standalone/engine/navigation/NavigationObserver.csproj tv-standalone/engine/overlay/CommercialOverlayProbe.csproj tv-standalone/recovery/payload-source/SamsungTvArchiveRoot.csproj tv-standalone/recovery/payload-source/SamsungTvRootAgent.csproj; do
+            dotnet build "$project" -c Release -p:UseAppHost=false
+          done
+      - run: dotnet run --project tv-standalone/tests/health/HealthTests.csproj

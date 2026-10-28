@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://commercial-break.local/recovery" version="0.1.1" viewmodes="maximized">
+<tizen:application id="cBRecov001.app" package="cBRecov001" required_version="3.0"/>
+<name>Commercial Break Recovery</name><content src="index.html"/><icon src="icon.png"/>
+<access origin="http://127.0.0.1:18765" subdomains="false"/>
+<feature name="http://tizen.org/feature/web.service"/>
+<tizen:privilege name="http://tizen.org/privilege/internet"/>
+<tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
+<tizen:privilege name="http://tizen.org/privilege/unlimitedstorage"/>
+<tizen:privilege name="http://tizen.org/privilege/application.info"/>
+<tizen:profile name="tv-samsung"/>
+<tizen:service id="cBRecov001.svc" auto-restart="true" on-boot="true"><tizen:content src="service/main.js"/><tizen:name>Commercial Break Recovery Service</tizen:name><tizen:description>Restores the existing Commercial Break engine after reboot.</tizen:description></tizen:service>
+<tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>
