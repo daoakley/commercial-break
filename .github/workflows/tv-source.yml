@@ -22,12 +22,24 @@ jobs:
       - run: pip install -r tv-standalone/tools/requirements.txt
       - run: node tv-standalone/recovery/tests/recovery.test.cjs
       - run: node tv-standalone/tests/test_debug_ui.js
+      - run: node tv-standalone/tests/test_daylight.js
       - run: python tv-standalone/tests/test_build_bundle.py
       - run: python tv-standalone/tests/test_themes.py
       - run: python tv-standalone/tests/test_supervisor.py
       - name: Build TV components and root payloads
         run: |
-          for project in tv-standalone/engine/CommercialBlock.csproj tv-standalone/engine/capture/AcrFrameProbe.csproj tv-standalone/engine/navigation/NavigationObserver.csproj tv-standalone/engine/overlay/CommercialOverlayProbe.csproj tv-standalone/recovery/payload-source/SamsungTvArchiveRoot.csproj tv-standalone/recovery/payload-source/SamsungTvRootAgent.csproj; do
+          for project in tv-standalone/engine/CommercialBlock.csproj tv-standalone/engine/capture/AcrFrameProbe.csproj tv-standalone/engine/navigation/NavigationObserver.csproj tv-standalone/engine/overlay/CommercialOverlayProbe.csproj tv-standalone/engine/audio/AudioSpliceObserver.csproj tv-standalone/recovery/payload-source/SamsungTvArchiveRoot.csproj tv-standalone/recovery/payload-source/SamsungTvRootAgent.csproj; do
             dotnet build "$project" -c Release -p:UseAppHost=false
           done
       - run: dotnet run --project tv-standalone/tests/health/HealthTests.csproj
+      - run: dotnet run --project tv-standalone/tests/debug/DebugTests.csproj -- "$RUNNER_TEMP/commercial-break-debug-tests"
+      - run: dotnet run --project tv-standalone/tests/themes/ThemeTests.csproj -- tv-standalone/engine
+      - run: dotnet run --project tv-standalone/tests/theme-lifecycle/LifecycleTests.csproj -- tv-standalone/engine
+      - run: dotnet run --project tv-standalone/tests/youtube-ui/YouTubeUiTests.csproj -- --self-test
+      - run: dotnet run --project tv-standalone/tests/youtube-skip/SkipGuardTests.csproj
+      - run: dotnet run --project tv-standalone/tests/youtube-hold/HoldTests.csproj
+      - name: Check app routing and evidence gates
+        run: |
+          for test in apps youtube_evidence verdicts pill_evidence layout_evidence; do
+            python "tv-standalone/tests/test_${test}.py" dotnet
+          done

@@ -24,6 +24,8 @@ case('covered invocation','keepCard',True,None)
 case('wrong template','detector','other')
 case('altered threshold','threshold',100)
 case('malformed','evidence',{},None)
+case('regular YouTube excludes broadcast heuristic','app','com.samsung.tv.cobalt-yt',None)
+case('unknown app excludes broadcast heuristic','app','',None)
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as directory:
     path=Path(directory)/'cases.json';path.write_text(json.dumps([row for _,row,_ in cases]))

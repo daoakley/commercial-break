@@ -58,7 +58,7 @@ def main():
     recovery=a.out/'recovery';recovery.mkdir();(recovery/'service').mkdir();(recovery/'payload').mkdir()
     for f in ['config.xml','index.html','VETRO-LICENSE']:shutil.copy2(ROOT/'recovery'/f,recovery/f)
     for f in (ROOT/'recovery/service').glob('*.js'):shutil.copy2(f,recovery/'service'/f.name)
-    for project,stem in [('engine/CommercialBlock.csproj','CommercialBlock'),('engine/capture/AcrFrameProbe.csproj','AcrFrameProbe'),('engine/overlay/CommercialOverlayProbe.csproj','CommercialOverlayProbe'),('engine/navigation/NavigationObserver.csproj','NavigationObserver')]:build_project(a.dotnet,ROOT/project,engine,stem)
+    for project,stem in [('engine/CommercialBlock.csproj','CommercialBlock'),('engine/capture/AcrFrameProbe.csproj','AcrFrameProbe'),('engine/overlay/CommercialOverlayProbe.csproj','CommercialOverlayProbe'),('engine/navigation/NavigationObserver.csproj','NavigationObserver'),('engine/audio/AudioSpliceObserver.csproj','AudioSpliceObserver')]:build_project(a.dotnet,ROOT/project,engine,stem)
     for stem in ['SamsungTvArchiveRoot','SamsungTvRootAgent']:build_project(a.dotnet,ROOT/'recovery/payload-source'/(stem+'.csproj'),recovery/'payload',stem)
     shutil.copytree(ROOT/'engine/themes',engine/'themes');shutil.copy2(ROOT/'engine/scene.json',engine/'scene.json')
     for name in ['watchdog.sh','engine-supervisor.sh','release-owned.sh','commercial-break-engine.service']:shutil.copy2(ROOT/'scripts'/name,engine/name)

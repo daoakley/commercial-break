@@ -142,6 +142,7 @@ internal static class Program
         if (basename.Length == 0 || basename.IndexOfAny(new[] { '/', '\\' }) >= 0) return 2;
         string path = "/opt/usr/home/owner/commercial-block/" + basename + ".png";
         string debugId=Environment.GetEnvironmentVariable("CAPTURE_DEBUG_ID");
+        bool youtubeOnly=Environment.GetEnvironmentVariable("CAPTURE_LOCAL_YOUTUBE_ONLY")=="1";
         bool debugImage=debugId!=null&&debugId.Length==32&&System.Linq.Enumerable.All(debugId,ch=>"0123456789abcdef".IndexOf(ch)>=0);
         if(debugImage)path="/run/commercial-block/debug-"+debugId+".png";
         IntPtr parameter = Marshal.AllocHGlobal(256);
@@ -160,7 +161,7 @@ internal static class Program
             // independently of the composed screenshot. Do not hide the card
             // when this mode has been explicitly selected and only fingerprints
             // are requested. Image exports still use the established handshake.
-            bool keepCard = Environment.GetEnvironmentVariable("CAPTURE_FINGERPRINT_ONLY") == "1"
+            bool keepCard = !youtubeOnly && Environment.GetEnvironmentVariable("CAPTURE_FINGERPRINT_ONLY") == "1"
                 && (Environment.GetEnvironmentVariable("CAPTURE_KEEP_CARD") == "1" || KeepCardWindowActive());
             bool cardActive = !keepCard && !string.IsNullOrEmpty(pauseFile) && !string.IsNullOrEmpty(ackFile);
             var clock = Stopwatch.StartNew();
@@ -171,6 +172,8 @@ internal static class Program
             long captureMillis;
             long imageAt = 0;
             bool pillHit = false;
+            bool youtubeHit = false;
+            bool youtubeChecked = false;
             byte[] layoutRgb = null;
             bool layoutQueued=false;
             try
@@ -227,7 +230,24 @@ internal static class Program
                     }
                     catch { /* Optional local check failure preserves the existing Samsung path. */ }
                 }
-                if (rc == 0 && !pillHit) SecureFingerprint.TryCaptureDue(imageAt);
+                if (rc == 0 && !keepCard && Environment.GetEnvironmentVariable("CAPTURE_CHECK_YOUTUBE") == "1")
+                {
+                    try {
+                        int w=Marshal.ReadInt32(parameter,0x08),h=Marshal.ReadInt32(parameter,0x0c),stride=Marshal.ReadInt32(parameter,0x2c);
+                        if ((long)stride*h>PlaneBytes) throw new ArgumentException("capture plane bounds");
+                        var localClock=Stopwatch.StartNew();
+                        var result=YouTubeAdUi.ScoreNv12(y,c,w,h,stride);
+                        string pathResult="/run/commercial-block/youtube-ui.json";
+                        File.WriteAllText(pathResult+".tmp",System.Text.Json.JsonSerializer.Serialize(new {
+                            at=imageAt,keepCard,detector=YouTubeAdUi.Detector,elapsedMs=localClock.Elapsed.TotalMilliseconds,
+                            result.hit,result.state,result.skipReady,result.sponsoredScore,result.countdownScore,result.skipScore,result.skipX,result.skipY,result.yellowPixels,
+                            result.controlKind,result.circleDigitPixels,result.circleRingPixels,result.circleRows,result.circleColumns,result.circleSectors,result.circleNoise
+                            ,result.timerReader,result.timerSeconds,result.timerMaxSeconds,result.timerScore,result.timerLayoutMargin
+                        }));
+                        File.Move(pathResult+".tmp",pathResult,true);youtubeHit=result.hit;youtubeChecked=true;
+                    } catch { /* A local check failure falls back to Samsung recognition. */ }
+                }
+                if (rc == 0 && !youtubeOnly && !pillHit && !youtubeHit) SecureFingerprint.TryCaptureDue(imageAt);
             }
             finally
             {
@@ -261,6 +281,7 @@ internal static class Program
                 Console.WriteLine($"rc=-100 width={width} height={height} pitch={pitch} backend=acr");
                 return 1;
             }
+            if(youtubeOnly&&!youtubeChecked)return 1;
             // Feed the separately warmed, isolated worker AFTER panel restoration.
             // Atomic latest-frame handoff; no image history is kept by this path.
             if (!keepCard && !pillHit && Environment.GetEnvironmentVariable("CAPTURE_CHECK_LAYOUT") == "1")
@@ -283,7 +304,7 @@ internal static class Program
                         panelMaskMillis = masked.ElapsedMilliseconds,
                         totalMillis = clock.ElapsedMilliseconds
                     }));
-                if(!debugImage)return pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
+                if(!debugImage)return youtubeChecked || pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
             }
             try {
             // NV12 (BT.601) -> RGB, nearest-neighbour resample to 480x270.
@@ -307,7 +328,7 @@ internal static class Program
                 // Debug disk/encoding failures never invalidate recognition.
                 try{File.Delete(path);File.Delete(path+".tmp");}catch{}
                 Console.Error.WriteLine("debug_image_unavailable");
-                return pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
+                return youtubeChecked || pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
             }
         }
         finally

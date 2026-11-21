@@ -25,6 +25,18 @@ fi
 if [ -f "$H/device.json" ] && ! cmp -s "$H/device.json" "$P/device.json"; then
  echo 'Existing device.json differs: rebuild with the exact installed private configuration'; exit 1
 fi
+# Replacing a worker during native capture can leave the TV scaler locked.
+# Require the operator to pause through the authenticated maintenance endpoint.
+if systemctl is-active --quiet commercial-break-engine.service; then
+ STATUS=$(curl -fsS --max-time 3 --config "$H/control.curl" http://127.0.0.1:18764/status) || {
+  echo 'Cannot verify capture state; no running files changed'; exit 1
+ }
+ printf '%s' "$STATUS" | grep -Eq '"maintenancePaused"[[:space:]]*:[[:space:]]*true' &&
+ printf '%s' "$STATUS" | grep -Eq '"recognitionInProgress"[[:space:]]*:[[:space:]]*false' || {
+  echo 'Pause maintenance and wait for capture to become idle before installing'; exit 1
+ }
+ unset STATUS
+fi
 B="$H/backups/release-$(date +%Y%m%d-%H%M%S)"
 mkdir "$B"
 for f in "$H"/*.dll "$H"/*.json "$H"/*.sh "$H"/*.service "$H"/*.so "$H"/control.curl; do

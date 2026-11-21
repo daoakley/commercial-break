@@ -25,9 +25,11 @@ Samsung will accept a device or region. The engine validates the server's
 fingerprint version and enabled query capability before recognition.
 
 The source uses `wss://acr-us-prd.samsungcloud.tv/getacrinfo`, fingerprint version
-1.2 and normal recognition query type 1. The image fingerprint is computed on
+1.2 and normal recognition query type 1. For YouTube TV, the image fingerprint is computed on
 the TV; its result and device/source metadata are sent to Samsung. Local pill
-checks do not contact an AI model. Metadata does not establish a show title or
+checks do not contact an AI model. Regular YouTube uses its local countdown/Skip
+checks and does not generate fingerprints or open this recognition connection.
+The current provisioning tool still requires the shared device configuration. Metadata does not establish a show title or
 channel when the TV has not exposed one.
 
 The build tool generates `controlToken` when it is absent. For updates, use the

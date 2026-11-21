@@ -59,3 +59,8 @@ tv-standalone/**/appearance.json
 **/certificates/
 **/*.sqlite
 **/engine.tar.gz
+
+# Private agent handoffs and deployment-session notes.
+HANDOFF.md
+docs/*HANDOFF*.md
+docs/PROJECT_STATUS.md

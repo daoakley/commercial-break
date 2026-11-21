@@ -5,4 +5,5 @@
     <Nullable>disable</Nullable>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup><Compile Include="../YouTubeDetectionPolicy.cs" Link="YouTubeDetectionPolicy.cs"/></ItemGroup>
 </Project>

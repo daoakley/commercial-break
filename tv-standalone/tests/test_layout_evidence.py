@@ -16,6 +16,8 @@ case('card capture','keepCard',True,None);case('other model','modelId','refit')
 case('other detector','detector','other');case('changed margin','threshold',0)
 case('slow worker','elapsedMs',1501);case('invalid timing','elapsedMs',-1)
 case('missing result','evidence',{},None)
+case('regular YouTube excludes broadcast heuristic','app','com.samsung.tv.cobalt-yt',None)
+case('unknown app excludes broadcast heuristic','app','',None)
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as d:
     path=Path(d)/'cases.json';path.write_text(json.dumps([r for _,r,_ in cases]))

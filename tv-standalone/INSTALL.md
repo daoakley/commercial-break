@@ -66,7 +66,7 @@ private/build-venv/bin/python tv-standalone/tools/build.py \
 ```
 
 Use `--dotnet /path/to/dotnet` if the SDK is not on PATH. The tool compiles the
-engine, capture, overlay, navigation and root-recovery payloads, validates the
+engine, capture, overlay, navigation, optional audio and root-recovery payloads, validates the
 capture-library hash, creates matching private controller configuration and
 signs both widgets. It makes no TV connection. It refuses an existing output
 folder so credentials and backups cannot be silently replaced.
@@ -118,8 +118,8 @@ tizen install -n commercial-break.wgt -t TV_TARGET -- private/tv-build
 tizen install -n commercial-break-recovery.wgt -t TV_TARGET -- private/tv-build
 ```
 
-Open **Commercial Break**, turn it on, then return to YouTube TV. Verify fresh
-recognition checks, a covered ad and normal return to the show before enabling
+Open **Commercial Break**, turn it on, then return to YouTube TV or regular YouTube. Verify increasing checks,
+a covered ad and normal return to the show before enabling
 reboot recovery. The computer-assisted blocker must be stopped to avoid two
 systems controlling the TV. The optional layout detector remains off without a
 separately validated local model.
@@ -167,14 +167,21 @@ command. Allow up to 90 seconds for startup, then read `status` again. Verify:
 
 - A different boot ID and a connected UID-0 agent.
 - A fresh engine PID with the saved On/Off choice.
-- Increasing queries after opening YouTube TV, normal playback, ad coverage and
-  return to programming.
+- Increasing queries in YouTube TV, or increasing local UI checks with no Samsung
+  queries in regular YouTube; normal playback, ad coverage and return to programming.
 
 A launcher PID or an installed app icon alone does not establish recovery.
 
 ## Updating, disabling and removal
 
 Use the same signing identity and installed device configuration for updates.
+Before running the installer against an active engine, pause it through the
+authenticated TV-local `/maintenance` endpoint and wait until `/status` reports
+`recognitionInProgress:false`. The installer requires this idle maintenance state
+and refuses an older engine without it. For an older version, stop blocking from
+its controller and confirm capture is idle before stopping its service. Off
+clears debug records; preserve anything needed privately within its existing
+retention deadline. Never kill an active capture worker.
 The installer preserves settings and saves a backup under
 `/opt/usr/home/owner/commercial-block/backups/`. Build both controller and engine
 from the same revision. Keep private rollback bundles outside Git.

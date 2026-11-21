@@ -2,8 +2,9 @@
 
 Commercial Break runs on a Samsung Frame TV and covers commercials with a themed
 screen while muting their audio. The show continues playing underneath. The
-current version uses Samsung recognition and local image checks on the TV; it
-does not need Docker, a computer, or an LLM running during viewing.
+current version supports **YouTube TV and regular YouTube** using app-specific
+recognition and local image checks on the TV. It does not need Docker, a
+computer, or an LLM running during viewing.
 
 The installed TV app provides On/Off controls, a break-screen theme picker, and
 an optional 48-hour debug session. The privileged background engine does the
@@ -29,37 +30,40 @@ TV's native secure fingerprinting functions. A process-local copy of a capture
 library supplies the access needed on the tested firmware; proprietary Samsung
 libraries are obtained from the owner's TV and are not distributed here.
 
-```text
-YouTube TV picture
-  ├─ Local Sponsored-pill match ───────────────────┐
-  ├─ Optional local advertising-layout classifier ┤
-  └─ Native fingerprint → Samsung recognition ────┤
-                                                  ▼
-                                  Mute + themed Commercial Break card
-                                  Playback continues underneath
-```
+| App | Detection on the TV | External recognition |
+| --- | --- | --- |
+| YouTube TV | Sponsored-pill matching; optional layout classifier; native Samsung fingerprints | Samsung recognition service |
+| YouTube | Bottom-right countdown, “Skip in,” and highlighted Skip controls | None |
 
-- **Sponsored pill:** checks the tested YouTube TV upper-left indicator directly
-  in capture buffers. A positive match can act before a Samsung request.
-- **Samsung recognition:** submits native fingerprints to Samsung's configured
-  recognition service. A validated ad match starts or renews the cover.
-- **Experimental layout detector:** an optional small local classifier evaluates
-  image composition using the TV's existing OpenCV library. It has a separate
-  off switch and limited validation; it is not enabled merely by building this
-  repository. Its private trained model is not included.
-- **Release and recovery:** matches must be fresh and belong to the current
-  app/navigation state. Covers require renewal; watchdogs release owned controls
-  after failure. The main loop currently targets YouTube TV, not every TV app.
+Both paths raise the Commercial Break card and mute the ad while playback
+continues. Regular YouTube can also select a recognized Skip button when its
+separate automatic-Skip setting is enabled. Two consistent countdown readings
+keep the card steady until near the expected end; navigation cancels the wait.
+See [YouTube ad controls](tv-standalone/YOUTUBE_AD_CONTROLS.md) for supported
+layouts and safeguards.
+
+YouTube TV accepts fresh Samsung ad matches or a local Sponsored-pill match.
+Its optional advertising-layout classifier uses the TV's existing OpenCV library;
+the private trained model is not included. A separate experimental audio helper
+is also available, disabled by default; it is not required by either app.
+
+Matches must be fresh and belong to the current app/navigation state. Covers
+require renewal, and watchdogs release owned controls after failure. Other TV
+apps are not currently supported.
 
 Running on the TV does **not** mean entirely offline: the Samsung path sends
-fingerprints and device metadata to Samsung. The local checks need no remote
-AI service. This app does not disable Samsung tracking.
+fingerprints and device metadata to Samsung. Regular YouTube uses local image
+checks and makes no Samsung recognition requests. Neither app needs a remote AI
+service. This app does not disable Samsung tracking.
 
 ## TV controls and break screens
 
 Open **Commercial Break → Break screen** to preview and choose a theme. There
-are 23 choices: Original; seasonal, holiday and zen scenes; and day/night
-skyline scenes for Raleigh, Memphis, Washington DC and Charlotte. The Raleigh design includes landmark silhouettes and wooded foreground.
+are 26 choices: Original; seasonal, holiday and zen scenes; and day/night
+skyline scenes for Raleigh, Memphis, Washington DC and Charlotte. The Raleigh
+design includes landmark silhouettes and wooded foreground.
+Three city-rotation modes cycle scenes between breaks: Day, Night, and Auto.
+Auto uses a fixed Raleigh sunrise/sunset calculation; it does not obtain your location.
 
 Custom artwork uses a minimal clock in the upper-right. It is rendered locally
 with geometric primitives, with no artwork download or animation service.
@@ -93,7 +97,9 @@ building/signing, deployment, reboot recovery, validation and removal. The
 | Tests | [`tv-standalone/tests`](tv-standalone/tests) |
 
 Additional details: [Sponsored detection](tv-standalone/SPONSORED_PILL.md),
-[experimental layout detector and off switch](tv-standalone/EXPERIMENTAL_LAYOUT.md).
+[experimental layout detector and off switch](tv-standalone/EXPERIMENTAL_LAYOUT.md),
+[YouTube controls](tv-standalone/YOUTUBE_AD_CONTROLS.md), and
+[optional audio experiment](tv-standalone/AUDIO_SPLICE.md).
 The [computer-assisted guide](COMPUTER_ASSISTED.md) documents the optional
 Docker/Claude implementation at the repository root. Research under
 [`experiments`](experiments) is separate from the deployed app and is not a

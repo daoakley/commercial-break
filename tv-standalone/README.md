@@ -1,11 +1,15 @@
 # Standalone TV app
 
-This is the current Commercial Break controller, background engine and themed
-card renderer. The engine runs on the TV and targets YouTube TV. It combines
-Samsung recognition with the [local Sponsored-pill detector](SPONSORED_PILL.md)
-and an optional [experimental spatial classifier](EXPERIMENTAL_LAYOUT.md).
-It does not require the repository's computer-assisted detector or an LLM.
-Samsung recognition still uses Samsung's network service.
+Commercial Break runs its controller, background engine and card renderer on
+the TV. It supports regular YouTube (`com.samsung.tv.cobalt-yt`) and YouTube TV
+(`com.samsung.tv.cobalt-yttv`). Neither requires a computer or an LLM during viewing.
+
+Regular YouTube uses the [local countdown/Skip detector](YOUTUBE_AD_CONTROLS.md)
+and makes no Samsung recognition requests. YouTube TV combines Samsung recognition,
+the [Sponsored-pill detector](SPONSORED_PILL.md) and an optional
+[experimental layout classifier](EXPERIMENTAL_LAYOUT.md). Samsung recognition
+requires network access. The [audio experiment](AUDIO_SPLICE.md) is optional and
+disabled on fresh installations.
 
 ## Controls and appearance
 
@@ -21,7 +25,7 @@ graphic; save it to restore that design. Remote directional keys and Enter
 navigate; Back closes the selector. A saved theme applies to the next break.
 An active break card keeps its current artwork.
 
-The 23 choices are:
+The 26 choices are:
 
 - Original.
 - Seasons: Spring blossom, Summer shore, Autumn amber, Winter stillness.
@@ -30,10 +34,13 @@ The 23 choices are:
 - Zen: Desert quiet, Quiet water, Mist & mountains.
 - City skylines: Raleigh, Memphis, Washington DC and Charlotte, each in Day
   and Night.
+- City rotation: Day, Night and Auto. Each covered break advances to the next city.
+  Auto chooses day/night using a fixed Raleigh sunrise/sunset calculation.
 
 Custom scenes show only the clock in the upper-right, with no program metadata
 or break statistics over the artwork. Original retains its original information
-layout. Day/night and holiday choices are manual, not calendar-driven.
+layout. Individual scenes and holidays are manual. Only city Auto changes day/night
+automatically; artwork remains fixed for an active break.
 The Raleigh scenes use PNC and Wells Fargo silhouettes and a
 wooded foreground. Artwork consists of original geometric compositions rendered
 locally with EFL primitives; no downloaded art or animation service is needed.
@@ -95,6 +102,9 @@ Bearer control token. The controller calls it locally; it is not a LAN dashboard
 | `GET /status` | Engine, capture, matches, debug and selected/active theme status |
 | `POST /control` | Main On/Off, JSON `{"enabled":true}` or `false` |
 | `POST /appearance` | Select an allowlisted theme, e.g. `{"theme":"raleigh-night"}` |
+| `POST /maintenance` | Pause/resume with `{"paused":true/false}`; wait for `recognitionInProgress:false` before updating |
+| `POST /youtube-skip` | Enable/disable guarded automatic Skip with `{"enabled":true/false}`; defaults off |
+| `POST /audio` | Experimental audio mode `0` (off), `1` (observe), `2` (trigger) or `3` (recognition burst) |
 | `POST /debug` | Start a debug session or stop and clear its records |
 | `POST /layout` | Enable/disable only the experimental spatial classifier |
 
@@ -117,6 +127,8 @@ python3 tv-standalone/tests/test_themes.py
 node tv-standalone/tests/test_debug_ui.js
 dotnet run --project tv-standalone/tests/themes/ThemeTests.csproj -- tv-standalone/engine
 dotnet run --project tv-standalone/tests/theme-lifecycle/LifecycleTests.csproj -- tv-standalone/engine
+python3 tv-standalone/tests/test_apps.py /path/to/dotnet
+python3 tv-standalone/tests/test_youtube_evidence.py /path/to/dotnet
 python3 tv-standalone/tests/test_verdicts.py /path/to/dotnet
 python3 tv-standalone/tests/test_pill_evidence.py /path/to/dotnet
 python3 tv-standalone/tests/test_layout_evidence.py /path/to/dotnet
