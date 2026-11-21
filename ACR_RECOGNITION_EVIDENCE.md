@@ -54,6 +54,18 @@ The following is a **schematic, redacted field map**, not a raw request or reply
 | Three fingerprints from a visually corroborated Capital One commercial | Three close frame matches; five candidates typed `AD`. The same response also contained an ION/NCIS broadcast candidate. | 27 ms |
 | Three fingerprints from visually corroborated NFL game footage | Three close frame matches; zero ad candidates; game title, sports category and scheduled start/end; four possible affiliate stations carrying that game. | 27 ms |
 
+For a more concrete example, this is a **derived summary of the observed commercial reply**, not a verbatim server payload. The three `dist` values came from its three `result_frames` entries; identifying candidate IDs and timestamps have been removed:
+
+```json
+{
+  "result_frames": [{"matching": true, "dist": 5}, {"matching": true, "dist": 11}, {"matching": true, "dist": 8}],
+  "AD_candidate_count": 5,
+  "other_program_candidate": {"title": "NCIS", "channel": "ION Television HD"},
+  "queryIntervalSec": 60,
+  "request_to_reply_ms": 27
+}
+```
+
 The five ad candidates do **not** establish five different advertisements. The ION/NCIS candidate does **not** establish that the TV was tuned to ION. Likewise, four affiliates are not proof of which affiliate supplied the game. These are examples of the metadata the service can associate with a visual match, not a test of identification accuracy across channels.
 
 ## The separate ad-query format
