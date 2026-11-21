@@ -9,7 +9,7 @@ for t in entries:
     scene = json.loads((root/'engine/themes'/f"{t['id']}.json").read_text())
     assert t['id']=='default' or scene['infoMode']=='clock'
     objects = scene['objects']
-    assert 1 <= len(objects) <= 266
+    assert 1 <= len(objects) <= 256
     b = objects[0]
     assert b['type'] == 'rectangle' and [b[k] for k in ('x','y','width','height')] == [0,0,1920,1080]
     assert b['color'].endswith('FF')

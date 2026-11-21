@@ -41,9 +41,13 @@ Custom scenes show only the clock in the upper-right, with no program metadata
 or break statistics over the artwork. Original retains its original information
 layout. Individual scenes and holidays are manual. Only city Auto changes day/night
 automatically; artwork remains fixed for an active break.
-The Raleigh scenes use PNC and Wells Fargo silhouettes and a
-wooded foreground. Artwork consists of original geometric compositions rendered
-locally with EFL primitives; no downloaded art or animation service is needed.
+The city scenes use simplified landmark compositions, not surveyed panoramas.
+Memphis separates the Pyramid's riverbank from the bridge and water; DC preserves
+the Lincoln Memorial's rectangular roofline and the Washington Monument's slender
+proportions. Raleigh and Charlotte use their distinctive tower crowns and connected
+foregrounds. Day and night share the same landmark geometry, without vertical-only
+compression. Artwork is rendered locally with EFL primitives; no downloaded art or
+animation service is needed.
 
 ## Preview without a TV
 
@@ -142,3 +146,9 @@ TV controls. Passing them does not establish a live ad-detection accuracy rate.
 ## Artwork references
 
 Architectural references were studied, not bundled or traced as raster assets: [Raleigh photograph](https://raleighskyline.com/2015/downtown-raleigh-in-the-spring-2015/3340/raleigh-aerial-of-pnc-plaza/), [Charlotte office photograph](https://www.parkerpoe.com/offices/charlotte), [Memphis tourism](https://www.memphistravel.com/neighborhoods/downtown), [DC landmark view-plane study](https://planning.dc.gov/am/page/capital-landmarks-view-plane-study).
+
+Landmark details: [PNC Plaza](https://www.dpr.com/projects/pnc-plaza),
+[Corporate Center crown](https://www.focuslighting.com/bank-of-america-corporate-center),
+[Lincoln Memorial](https://www.nps.gov/linc/learn/publications.htm),
+[Washington Monument dimensions](https://www.nps.gov/wamo/faqs.htm), and
+[Memphis bridges](https://www.memphistravel.com/trip-ideas/mighty-lights).

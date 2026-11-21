@@ -1,145 +1,199 @@
-"""Original vector skyline compositions. Geographic landmark profiles, not photos."""
+"""Original vector landmark compositions with shared day/night geometry.
+
+Simplified, not a surveyed panorama. Buildings stand on land; bridges cross
+water. Coordinates are final screen coordinates, without vertical-only scaling.
+"""
 import math
 
-def city_scenes(base,rect,ellipse,poly,line,add):
-    for city,label,description in [
-        ('raleigh','Raleigh','PNC’s spire, the stepped Wells Fargo tower and Raleigh’s downtown roofline.'),
-        ('memphis','Memphis','The Pyramid, Hernando de Soto Bridge and the Mississippi riverfront.'),
-        ('dc','Washington, DC','The Capitol dome, Washington Monument and Lincoln Memorial.'),
-        ('charlotte','Charlotte','The Corporate Center’s crown, angular 550 South Tryon and Uptown towers.')]:
-      for night in [False,True]:
-        mode='night' if night else 'day'
-        if night: sky=('#111E30','#3D5262'); back='#465A6A';front='#203444';side='#2A4051';detail='#87998F';ground='#162A38';sun='#D8DCD5'
-        else: sky=('#324D61','#8FA2A6');back='#687F89';front='#3E5967';side='#4B6875';detail='#8EA4A7';ground='#304C5A';sun='#E3C999'
-        o=base(*sky)
-        o += [ellipse(1480,155,150,150,sun)]
-        # Deliberately still, sparse sky. These are vector stars, not animation.
+
+def city_scenes(base, rect, ellipse, poly, line, add):
+    cities = [
+        ('raleigh', 'Raleigh', 'PNC Plaza’s open crown, stepped 150 Fayetteville and a wooded foreground.'),
+        ('memphis', 'Memphis', 'The Pyramid on the riverbank, with the M Bridge crossing the Mississippi in front.'),
+        ('dc', 'Washington, DC', 'The Lincoln Memorial, slender Washington Monument and Capitol dome.'),
+        ('charlotte', 'Charlotte', 'Uptown’s glass pyramidal roof, angular 550 South Tryon and Corporate Center crown.')]
+    for city, label, description in cities:
+      for night in (False, True):
+        mode = 'night' if night else 'day'
         if night:
-          for x,y in [(228,180),(386,280),(1120,205),(1728,360),(1740,138)]:o.append(ellipse(x,y,3,3,'#A7B4B8'))
-        art_start=len(o)
-        def block(x,y,w,h,c=front):o.append(rect(x,y,w,h,c))
-        def shape(pts,c=front):o.append(poly(pts,c))
-        def windows(x,y,w,h,cols=3,rows=6):
-          # Restrained vertical facade rhythm keeps the silhouette dominant.
-          for col in range(cols):
-            xx=x+7+(w-14)*col/max(1,cols-1)
-            if night:
-              for row in range(rows):
-                if (col*3+row*5)%4!=0: o.append(rect(round(xx),round(y+row*h/rows),3,5,detail))
-            else:o.append(rect(round(xx),y,2,h,detail))
-        def lowrise(items,c=back):
-          for x,w,h in items:block(x,990-h,w,h,c)
-        if city=='raleigh':
-          # Original landmark composition, viewed from the north: Hanover left,
-          # PNC near the center and 150 Fayetteville right. Architectural profiles
-          # are simplified independently; this is not a trace of another print.
-          lowrise([(120,160,64),(275,125,110),(390,120,144),(635,120,165),(735,110,127),(1070,145,170),(1200,110,140),(1440,120,160),(1540,150,88),(1680,160,48)])
-          # Two Hanover Square: paired peaked roof towers, recessed center.
-          block(470,698,185,312,side)
-          block(470,709,62,301);block(593,709,62,301)
-          shape([(466,709),(501,662),(536,709)])
-          shape([(589,709),(624,662),(659,709)])
-          block(530,678,66,11);block(557,688,11,322,front)
-          windows(481,733,37,230,2,5);windows(604,733,37,230,2,5)
-          # PNC's crown sits over the narrow tall shaft, alongside a lower wing.
-          block(894,673,89,337);shape([(983,714),(1100,731),(1100,1010),(983,1010)],side)
-          block(887,665,104,12)
-          shape([(897,665),(938,595),(981,665)])
-          shape([(909,660),(938,610),(968,660)],back)
-          o.append(line(938,609,938,659,detail))
-          block(936,568,4,31);block(978,680,5,330,detail)
-          windows(907,700,56,235,3,6);windows(1004,755,72,191,3,5)
-          # 150 Fayetteville: angular, stepped crown and twin vertical shoulders.
-          shape([(1290,1010),(1290,728),(1303,728),(1303,705),(1317,705),(1317,682),(1331,682),(1331,659),(1350,659),(1350,636),(1373,636),(1373,654),(1392,654),(1392,676),(1410,676),(1410,699),(1426,699),(1426,724),(1441,724),(1441,1010)])
-          shape([(1350,660),(1373,660),(1373,715),(1392,715),(1392,787),(1410,787),(1410,1010),(1384,1010),(1384,812),(1367,812),(1367,741),(1350,741)],side)
-          windows(1309,752,37,205,2,6);windows(1406,754,22,202,2,5)
-          # Overlapping mid-rise masses create a continuous city rather than
-          # evenly spaced freestanding icons. Keep their details restrained.
-          block(700,878,129,132);block(716,863,98,15);windows(718,900,84,72,3,3)
-          block(811,914,80,96,side);block(1108,873,112,137);block(1121,859,86,14)
-          block(1211,927,90,83,side);block(1453,902,95,108)
-          lowrise([(270,135,50),(390,114,68),(640,81,66),(856,77,50),(1018,97,53),(1530,125,56)],front)
-          # Raleigh is inland: a continuous, irregular green tree line, not
-          # broad blue wave-like ellipses or an exposed horizontal water band.
-          ground='#1C302C' if night else '#3A554B'
-          foliage='#294039' if night else '#50695B'
-          canopy=[(0,1080),(0,989)]
-          for x in range(0,1921,20):
-            y=987+12*math.sin(x*.019)+8*math.sin(x*.057)+5*math.cos(x*.131)
-            canopy.append((x,round(y)))
-          canopy.append((1920,1080));shape(canopy,ground)
-          # Individual upright crowns give the foreground an unmistakable
-          # wooded character while leaving the landmark roofs unobstructed.
-          for x,y,s in [(160,969,1),(308,952,1.15),(690,970,.85),(1180,966,.9),(1548,951,1.2),(1745,970,.9)]:
-            block(round(x+24*s),round(y+32*s),round(5*s),round(60*s),ground)
-            o.append(ellipse(x,round(y+18*s),round(53*s),round(50*s),foliage))
-            o.append(ellipse(round(x+12*s),round(y-8*s),round(34*s),round(52*s),foliage))
-            o.append(ellipse(round(x+29*s),round(y+24*s),round(32*s),round(40*s),foliage))
-        elif city=='memphis':
-          lowrise([(1010,85,100),(1110,85,160),(1235,70,122),(1350,90,90),(1490,90,130),(1620,75,100),(1720,130,65)],back)
-          # North riverbank Pyramid, a distinctive low, wide profile.
-          shape([(270,998),(455,730),(642,998)]);shape([(455,730),(642,998),(490,998)],side)
-          o.append(line(455,733,490,996,detail))
-          # 100 North Main's rooftop pavilion and the slender historic Sterick.
-          block(1235,764,104,234);block(1250,747,74,18);block(1265,737,43,10);windows(1250,785,73,178,4,6)
-          shape([(1415,998),(1415,812),(1429,812),(1429,786),(1444,786),(1444,762),(1476,762),(1476,786),(1491,786),(1491,812),(1505,812),(1505,998)])
-          windows(1434,829,51,140,3,5)
-          block(1605,859,96,139);windows(1620,880,65,88,3,4)
-          # Hernando de Soto bridge: two continuous M-shaped arches over water.
-          for start in [10,470]:
-            pts=[]
-            for i in range(25):
-              t=i/24;pts.append((start+t*460,966-127*math.sin(math.pi*t)))
-            pts += [(x,y+9) for x,y in reversed(pts)]
-            shape(pts,side)
-            for i in range(1,12):
-              t=i/12;x=start+t*460;y=966-127*math.sin(math.pi*t);o.append(rect(round(x),round(y+6),3,round(974-y),side))
-          block(0,975,980,12,front)
-          for x in [13,469,927]:block(x,985,13,58,front)
-          block(970,986,950,42,ground)
-          block(0,1030,1920,50,ground)
-          for x,y,w in [(75,1044,290),(510,1055,240),(980,1043,110),(1340,1063,230)]:block(x,y,w,2,side)
-        elif city=='dc':
-          # Low horizontal city, with the great public monuments above it.
-          lowrise([(0,190,55),(205,120,75),(420,150,47),(650,145,70),(840,125,58),(1040,130,74),(1710,210,65)],back)
-          # Lincoln Memorial: classical pediment, broad entablature, colonnade.
-          block(120,915,240,90);block(107,902,266,14);shape([(109,902),(240,874),(371,902)])
-          for x in range(137,350,29):block(x,925,13,65,side)
-          block(108,1001,266,9);block(97,1010,288,9)
-          # Washington Monument: one unmistakably slender obelisk.
-          shape([(671,1015),(681,720),(699,686),(717,720),(727,1015)]);shape([(699,686),(717,720),(727,1015),(699,1015)],side)
-          # Capitol: wings and colonnaded drum beneath a curved dome and lantern.
-          block(1210,919,465,96);block(1185,1006,515,12);block(1275,905,336,15)
-          block(1379,853,127,66);block(1367,847,151,11)
-          dome=[(1382,847)]+[(1442+61*math.cos(math.pi+i*math.pi/24),847+98*math.sin(math.pi+i*math.pi/24)) for i in range(25)]+[(1503,847)]
-          shape(dome);block(1428,741,28,13);block(1434,724,16,19);shape([(1433,724),(1442,708),(1451,724)]);block(1441,693,3,17)
-          for x in range(1390,1503,18):block(x,863,7,41,side)
-          for x in list(range(1230,1372,22))+list(range(1523,1667,22)):block(x,938,6,55,side)
-          block(0,1021,1920,59,ground)
+            sky = ('#111E30', '#3D5262')
+            back, front, side, detail, ground, sun = '#465A6A', '#203444', '#2A4051', '#87998F', '#162A38', '#D8DCD5'
         else:
-          lowrise([(0,110,75),(115,120,110),(245,115,90),(470,110,160),(600,100,100),(835,104,120),(960,100,175),(1170,95,120),(1445,100,120),(1580,100,110),(1700,220,60)],back)
-          # 550 South Tryon (former Duke Energy Center): sloping cutout crown.
-          shape([(320,1000),(320,754),(334,706),(447,655),(447,1000)])
-          shape([(338,739),(352,713),(429,681),(429,698)],back)
-          block(439,660,5,340,side);windows(339,767,81,190,4,7)
-          # Bank of America Corporate Center: setbacks and open, radiating crown.
-          shape([(742,1000),(742,786),(750,786),(750,752),(761,752),(761,720),(772,720),(772,697),(784,697),(784,678),(796,678),(796,663),(866,663),(866,678),(879,678),(879,697),(891,697),(891,720),(902,720),(902,752),(913,752),(913,786),(921,786),(921,1000)])
-          shape([(794,663),(803,643),(813,625),(831,603),(849,625),(859,643),(869,663)],side)
-          for x in [801,812,824,838,850,862]:o.append(line(x,661,831,604,detail))
-          block(827,592,5,13,front);windows(770,796,122,170,5,7)
-          # One Wells Fargo's rounded shoulder, and a pyramidal Legacy Union roof.
-          block(1066,805,128,195);o.append(ellipse(1066,767,128,78,front));block(1091,813,84,187,side);windows(1085,836,84,130,4,5)
-          block(1324,830,135,170);shape([(1324,830),(1392,755),(1459,830)]);shape([(1392,755),(1459,830),(1392,830)],side);block(1317,831,149,9);windows(1342,854,96,112,4,5)
-          lowrise([(205,140,70),(448,120,65),(610,110,89),(931,115,50),(1190,125,83),(1466,130,60)],front)
-          block(0,1015,1920,65,ground)
-        if city=='raleigh':o.append(rect(0,1050,1920,30,ground))
-        # Keep even the tallest spire comfortably below the subtitle.
-        for obj in o[art_start:]:
-          if obj['type'] in ('rectangle','ellipse'):
-            obj['y']=round(1080+(obj['y']-1080)*.85)
-            obj['height']=max(1,round(obj['height']*.85))
-          elif obj['type']=='polygon':
-            for pt in obj['points']:pt['y']=round(1080+(pt['y']-1080)*.85)
-          elif obj['type']=='line':
-            for key in ('y1','y2'):obj[key]=round(1080+(obj[key]-1080)*.85)
-        add(city+'-'+mode,label+' · '+mode.title(),'City skylines',description,o)
+            sky = ('#324D61', '#8FA2A6')
+            back, front, side, detail, ground, sun = '#687F89', '#3E5967', '#4B6875', '#8EA4A7', '#304C5A', '#E3C999'
+        foliage = '#294039' if night else '#50695B'
+        o = base(*sky) + [ellipse(1480, 155, 150, 150, sun)]
+        if night:
+            for x, y in [(228, 180), (386, 280), (1120, 205), (1728, 360), (1740, 138)]:
+                o.append(ellipse(x, y, 3, 3, '#A7B4B8'))
+
+        def block(x, y, w, h, c=front):
+            o.append(rect(x, y, w, h, c))
+
+        def shape(points, c=front):
+            o.append(poly(points, c))
+
+        def stroke(x, y, xx, yy, c=detail):
+            o.append(line(x, y, xx, yy, c))
+
+        def windows(x, y, w, h, cols=3, rows=4):
+            for col in range(cols):
+                xx = round(x + 7 + (w - 14) * col / max(1, cols - 1))
+                if night:
+                    for row in range(rows):
+                        if (col * 3 + row * 5) % 4 != 0:
+                            block(xx, round(y + row * h / rows), 3, 5, detail)
+                else:
+                    block(xx, y, 2, h, detail)
+
+        def lowrise(items, c=back, baseline=1015):
+            for x, w, h in items:
+                block(x, baseline - h, w, h, c)
+
+        if city == 'raleigh':
+            lowrise([(120, 160, 64), (275, 125, 95), (390, 120, 128), (635, 120, 145),
+                     (735, 110, 112), (1100, 145, 147), (1200, 110, 122), (1440, 120, 139), (1540, 150, 77), (1680, 160, 48)])
+            # Two Hanover Square: twin peaked shoulders and a recessed center.
+            block(470, 767, 160, 248, side)
+            block(470, 773, 55, 242); block(575, 773, 55, 242)
+            shape([(466, 773), (497, 730), (529, 773)])
+            shape([(571, 773), (602, 730), (634, 773)])
+            block(524, 747, 53, 10); block(547, 757, 8, 258)
+            windows(480, 794, 35, 172, 2); windows(585, 794, 35, 172, 2)
+            # PNC is a broad glass slab. Its taller end carries an open crown;
+            # the adjoining upper facade is only slightly lower, not a low wing.
+            block(880, 757, 194, 258)
+            shape([(1074, 757), (1114, 746), (1114, 1015), (1074, 1015)], side)
+            block(1036, 730, 78, 285, side); block(1029, 722, 92, 10)
+            for dx in (0, 15, 30, 45, 60, 75):
+                stroke(1037 + dx, 721, 1074 + (dx - 37) * .12, 674)
+            stroke(1035, 722, 1074, 668); stroke(1115, 722, 1074, 668)
+            block(1072, 651, 3, 24)
+            windows(894, 779, 127, 188, 5); windows(1047, 749, 53, 218, 3)
+            # 150 Fayetteville's stepped masonry crown and vertical shoulders.
+            shape([(1288, 1015), (1288, 804), (1301, 804), (1301, 783), (1315, 783),
+                   (1315, 765), (1332, 765), (1332, 747), (1350, 747), (1350, 734),
+                   (1372, 734), (1372, 751), (1390, 751), (1390, 773), (1405, 773),
+                   (1405, 794), (1420, 794), (1420, 1015)])
+            shape([(1350, 751), (1372, 751), (1372, 801), (1390, 801), (1390, 849),
+                   (1405, 849), (1405, 1015), (1383, 1015), (1383, 867), (1367, 867),
+                   (1367, 817), (1350, 817)], side)
+            windows(1302, 823, 36, 143, 2); windows(1394, 826, 18, 140, 2)
+            lowrise([(270, 135, 50), (390, 114, 68), (640, 81, 66), (715, 120, 117),
+                     (820, 70, 78), (1120, 112, 123), (1220, 75, 68), (1453, 95, 99), (1530, 125, 56)], front)
+            ground = '#1C302C' if night else '#3A554B'
+            canopy = [(0, 1080), (0, 1008)]
+            for x in range(0, 1921, 20):
+                y = 1007 + 9 * math.sin(x * .019) + 6 * math.sin(x * .057) + 4 * math.cos(x * .131)
+                canopy.append((x, round(y)))
+            shape(canopy + [(1920, 1080)], ground)
+            for x, y, s in [(160, 995, 1), (308, 983, 1.1), (690, 997, .85),
+                            (1180, 994, .9), (1548, 981, 1.15), (1745, 997, .9)]:
+                o.append(ellipse(x, y, round(48 * s), round(34 * s), foliage))
+                o.append(ellipse(round(x + 13 * s), round(y - 18 * s), round(29 * s), round(43 * s), foliage))
+
+        elif city == 'memphis':
+            # Three planes: city on the far bank, river in front, and bridge
+            # crossing from the left. No bridge crosses the Pyramid footprint.
+            lowrise([(1120, 85, 74), (1220, 70, 110), (1350, 90, 80),
+                     (1490, 90, 103), (1620, 75, 81), (1720, 130, 58)], baseline=956)
+            block(1242, 756, 94, 200); block(1254, 744, 70, 14); block(1268, 736, 42, 9)
+            windows(1256, 776, 66, 142, 4)
+            shape([(1425, 956), (1425, 809), (1438, 809), (1438, 787), (1452, 787),
+                   (1452, 768), (1479, 768), (1479, 787), (1494, 787), (1494, 809),
+                   (1507, 809), (1507, 956)])
+            windows(1441, 826, 51, 102, 3)
+            block(1610, 839, 91, 117); windows(1623, 857, 63, 70, 3)
+            block(0, 956, 1920, 124, ground)
+            # A visible base well inland of the waterline, separate from the
+            # bridge abutment. The Pyramid stands on land, not on the bridge.
+            shape([(850, 950), (1010, 740), (1170, 950)])
+            shape([(1010, 740), (1170, 950), (1040, 950)], side)
+            stroke(1010, 743, 1040, 947); block(846, 950, 328, 9, side)
+            bank = '#233C35' if night else '#506458'
+            shape([(660, 985), (785, 956), (1920, 956), (1920, 1018), (765, 1018), (660, 1002)], bank)
+            for x, y, w in [(790, 957, 39), (1190, 954, 48), (1355, 953, 43), (1550, 956, 45), (1765, 952, 51)]:
+                o.append(ellipse(x, y, w, 22, foliage))
+            shape([(0, 1008), (755, 1008), (885, 1015), (1920, 1015), (1920, 1080), (0, 1080)], ground)
+            stroke(880, 1014, 1920, 1014, side)
+            # Paired tied-arch trusses, with thickness and diagonal bracing.
+            # Both spans end before the Pyramid footprint begins at x=846.
+            for start in (-14, 376):
+                def arch(t):
+                    return 999 - 105 * math.sin(math.pi * t)
+                upper = [(start + t * 390, arch(t)) for t in [i / 24 for i in range(25)]]
+                shape(upper + [(x, y + 12) for x, y in reversed(upper)], side)
+                for i in range(1, 10):
+                    t = i / 10
+                    x, y = start + t * 390, arch(t)
+                    block(round(x), round(y + 12), 3, round(1004 - y - 12), side)
+                for i in range(10):
+                    t, u = i / 10, (i + 1) / 10
+                    stroke(start + t * 390, arch(t) + (12 if i % 2 else 0),
+                           start + u * 390, arch(u) + (0 if i % 2 else 12))
+            block(0, 1003, 805, 11)
+            for x in (4, 372, 762):
+                block(x, 1014, 13, 44)
+            block(789, 1006, 22, 26, side)
+            for x, y, w in [(75, 1045, 230), (440, 1063, 205), (990, 1042, 170), (1380, 1063, 270)]:
+                block(x, y, w, 2, side)
+
+        elif city == 'dc':
+            lowrise([(0, 155, 48), (405, 135, 50), (565, 100, 43), (860, 125, 48),
+                     (1020, 130, 57), (1740, 180, 55)], baseline=1020)
+            # Rectangular attic, horizontal entablature and eight front columns.
+            block(168, 888, 224, 26); block(158, 914, 244, 13)
+            block(170, 927, 220, 67, side)
+            for x in range(175, 387, 29):
+                block(x, 927, 13, 66)
+            block(156, 994, 248, 8); block(146, 1002, 268, 9); block(136, 1011, 288, 9)
+            # Approximately 10:1 height/base width: 555 feet tall, 55-foot base.
+            shape([(727, 1020), (732, 696), (745, 660), (758, 696), (763, 1020)])
+            shape([(745, 660), (758, 696), (763, 1020), (745, 1020)], side)
+            block(1230, 954, 420, 61); block(1215, 1013, 450, 7)
+            block(1376, 908, 128, 107); block(1366, 901, 148, 9)
+            dome = [(1378, 901)] + [(1440 + 62 * math.cos(math.pi + i * math.pi / 24),
+                                    901 + 78 * math.sin(math.pi + i * math.pi / 24)) for i in range(25)]
+            shape(dome + [(1502, 901)])
+            block(1427, 815, 26, 10); block(1433, 799, 14, 17)
+            shape([(1431, 799), (1440, 786), (1449, 799)]); block(1439, 775, 3, 13)
+            for x in range(1389, 1500, 18):
+                block(x, 918, 7, 35, side)
+            for x in list(range(1246, 1363, 22)) + list(range(1520, 1639, 22)):
+                block(x, 965, 6, 35, side)
+            block(0, 1020, 1920, 60, ground)
+
+        else:
+            # South-side composition: Legacy Union and 550 South Tryon in
+            # front, Corporate Center deeper into Uptown, 301 S College right.
+            lowrise([(0, 160, 64), (175, 140, 94), (475, 115, 118), (770, 120, 137),
+                     (860, 95, 165), (1110, 95, 156), (1460, 110, 98), (1590, 120, 74), (1740, 180, 60)])
+            # Corporate Center's terraced shoulders and tiered upright masts.
+            shape([(932, 1015), (932, 766), (942, 766), (942, 745), (953, 745),
+                   (953, 731), (965, 731), (965, 722), (1035, 722), (1035, 731),
+                   (1047, 731), (1047, 745), (1058, 745), (1058, 766), (1068, 766), (1068, 1015)])
+            shape([(965, 722), (965, 686), (977, 670), (990, 660), (1010, 660),
+                   (1023, 670), (1035, 686), (1035, 722)], side)
+            for x, top in [(965, 680), (977, 662), (989, 651), (1001, 648), (1013, 651), (1025, 662), (1037, 680)]:
+                block(x, top, 2, 722 - top, detail)
+            stroke(967, 703, 1037, 703); stroke(965, 717, 1039, 717)
+            windows(948, 787, 102, 173, 4)
+            # Legacy Union: glass pyramid above a horizontal cornice and slab.
+            block(330, 822, 124, 193)
+            shape([(324, 815), (391, 753), (460, 815)])
+            shape([(391, 753), (460, 815), (391, 815)], side)
+            block(322, 815, 140, 8); block(329, 862, 126, 6, side)
+            windows(341, 881, 101, 90, 4)
+            # 550 South Tryon's angled crown has a visible open cutout.
+            shape([(594, 1015), (594, 762), (606, 716), (716, 690), (716, 1015)])
+            shape([(609, 749), (621, 723), (703, 704), (703, 718)], back)
+            block(708, 700, 5, 315, side); windows(608, 782, 87, 182, 4)
+            # Rounded barrel roof and narrower vertical face of 301 S College.
+            o.append(ellipse(1260, 775, 112, 64, front))
+            block(1260, 807, 112, 208); block(1280, 814, 75, 201, side)
+            windows(1277, 838, 76, 128, 3)
+            lowrise([(235, 100, 62), (455, 128, 83), (720, 120, 112), (855, 85, 67),
+                     (1070, 128, 75), (1190, 74, 55), (1380, 116, 87), (1520, 105, 48)], front)
+            block(0, 1015, 1920, 65, ground)
+
+        add(city + '-' + mode, label + ' · ' + mode.title(), 'City skylines', description, o)
