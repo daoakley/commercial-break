@@ -15,7 +15,9 @@ applications, or install a custom launcher.
    precedes the scoped package-registry update.
 5. If Commercial Break is not active, it copies the installed unit into
    `/run/systemd/system`, reloads systemd and starts the supervised engine.
-6. The engine reads the saved On/Off setting. Off remains Off.
+6. If the owner enabled the optional [firmware update lock](../FIRMWARE_UPDATE_LOCK.md),
+   the engine unit reapplies its runtime masks before launching the engine.
+7. The engine reads the saved On/Off setting. Off remains Off.
 
 The widget and its armed marker persist under `/opt`. Root is reacquired at
 startup; it is not retained through the power loss. `/run` state is recreated.

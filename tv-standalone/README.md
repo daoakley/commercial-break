@@ -95,6 +95,8 @@ is not required for Samsung/Sponsored operation.
 [Crash recovery](RECOVERY.md) handles process exits, stalled detection and
 repeated exceptions. The separate [boot recovery service](recovery/README.md)
 reacquires root after power loss and preserves the main app's On/Off setting.
+An [optional firmware update lock](FIRMWARE_UPDATE_LOCK.md) can be enabled by
+the TV owner and is independent of ad detection.
 
 ## Runtime controls and maintenance
 

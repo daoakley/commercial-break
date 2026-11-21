@@ -8,6 +8,7 @@ User=root
 UMask=0077
 WorkingDirectory=/opt/usr/home/owner/commercial-block
 ExecStartPre=-/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/release-owned.sh | /bin/sh'
+ExecStartPre=-/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/firmware-update-lock.sh | /bin/sh'
 ExecStart=/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/engine-supervisor.sh | /bin/sh'
 ExecStopPost=/bin/sh -c 'cat /opt/usr/home/owner/commercial-block/release-owned.sh | /bin/sh'
 Restart=always
