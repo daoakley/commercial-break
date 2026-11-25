@@ -38,6 +38,8 @@ jobs:
       - run: dotnet run --project tv-standalone/tests/youtube-ui/YouTubeUiTests.csproj -- --self-test
       - run: dotnet run --project tv-standalone/tests/youtube-skip/SkipGuardTests.csproj
       - run: dotnet run --project tv-standalone/tests/youtube-hold/HoldTests.csproj
+      - run: dotnet run --project tv-standalone/tests/pipeline/PipelineTests.csproj
+      - run: python tv-standalone/tests/test_recovery_status.py
       - name: Check app routing and evidence gates
         run: |
           for test in apps youtube_evidence verdicts pill_evidence layout_evidence; do

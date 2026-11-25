@@ -11,7 +11,10 @@ The standalone engine now checks YouTube TV's fixed upper-left **Sponsored** ind
 5. Otherwise use the existing Samsung recognition path. Captures made with the cover card still visible skip the local matcher; the established masked fallback can inspect the underlying picture.
 6. Existing eight-second lease expiry, navigation release, Art Mode guard, independent watchdog, and owned-mute restoration remain in place.
 
-The engine still targets an initial check every second, subject to capture/process/network time. The timing below measures the matcher alone, **not** ad-onset-to-card latency. The existing Samsung error backoff can still delay later captures. Eliminating that dependency is a separate change requiring measurement.
+The engine targets uncovered checks every second, subject to capture and local
+processing time. Samsung runs in a separate, single-operation lane; its error
+backoff does not delay uncovered local captures. The timing below measures the
+matcher alone, **not** ad-onset-to-card latency. See [scheduling and diagnostics](DETECTION_PIPELINE.md).
 
 ## Evidence from the development TV, 2026-10-27
 

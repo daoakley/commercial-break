@@ -13,5 +13,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="CommercialOverlayProbe.cs" />
+    <Compile Include="../OverlayReceipt.cs" Link="OverlayReceipt.cs" />
   </ItemGroup>
 </Project>

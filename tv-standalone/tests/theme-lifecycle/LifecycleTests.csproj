@@ -1,1 +1,24 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems><StartupObject>LifecycleTests</StartupObject></PropertyGroup><ItemGroup><Compile Include="../../engine/Program.cs"/><Compile Include="../../engine/ThemeSettings.cs"/><Compile Include="../../engine/DebugRecords.cs"/><Compile Include="Tests.cs"/><Compile Include="../../engine/EngineHealth.cs"/><Compile Include="../../engine/YouTubeSkipGuard.cs"/><Compile Include="../../engine/YouTubeDetectionPolicy.cs"/><Compile Include="../../engine/YouTubeCountdownHold.cs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StartupObject>LifecycleTests</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../engine/Program.cs" />
+    <Compile Include="../../engine/ThemeSettings.cs" />
+    <Compile Include="../../engine/DebugRecords.cs" />
+    <Compile Include="Tests.cs" />
+    <Compile Include="../../engine/EngineHealth.cs" />
+    <Compile Include="../../engine/YouTubeSkipGuard.cs" />
+    <Compile Include="../../engine/YouTubeDetectionPolicy.cs" />
+    <Compile Include="../../engine/YouTubeCountdownHold.cs" />
+    <Compile Include="../../engine/SamsungVerdict.cs" />
+    <Compile Include="../../engine/RecognitionLane.cs" />
+    <Compile Include="../../engine/SamsungRecognitionClient.cs" />
+    <Compile Include="../../engine/DetectionPipeline.cs" />
+    <Compile Include="../../engine/DetectionTiming.cs" />
+    <Compile Include="../../engine/OverlayReceipt.cs" />
+  </ItemGroup>
+</Project>

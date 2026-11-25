@@ -54,6 +54,7 @@ internal static class CommercialOverlayProbe
     private static string standbyFile;
     private static string navigationFile;
     private static bool isPaused;
+    private static long lastReceipt;
 
     [DllImport("libc.so.6", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
     private static extern int open(string path, int flags, int mode);
@@ -630,6 +631,7 @@ internal static class CommercialOverlayProbe
                 evas_object_show(controlledWindow);
                 isPaused = false;
             }
+            if (!shouldPause && !isPaused) OverlayReceipt.Publish(leaseFile, ref lastReceipt);
         }
         catch (IOException)
         {
