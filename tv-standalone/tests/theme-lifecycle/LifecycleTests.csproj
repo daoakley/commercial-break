@@ -18,6 +18,7 @@
     <Compile Include="../../engine/RecognitionLane.cs" />
     <Compile Include="../../engine/SamsungRecognitionClient.cs" />
     <Compile Include="../../engine/DetectionPipeline.cs" />
+    <Compile Include="../../engine/ArchiveContinuation.cs" />
     <Compile Include="../../engine/DetectionTiming.cs" />
     <Compile Include="../../engine/OverlayReceipt.cs" />
   </ItemGroup>
