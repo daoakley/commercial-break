@@ -106,6 +106,43 @@ The runtime unit disappears at reboot. The optional
 starts the engine automatically. Without that widget, the engine still needs a
 privileged restart after a full boot.
 
+## Full TV reboot
+
+A full TV reboot removes the runtime systemd unit even when the saved On setting
+remains true. The crash supervisor above cannot restart a unit that no longer
+exists. On the tested TV the root filesystem is read-only, so simply placing
+the unit under `/etc/systemd/system` is not a persistent alternative. The
+separate boot-recovery widget only self-roots when Developer Mode
+Host PC IP is `127.0.0.1`; when it points at a computer, use the existing
+computer developer connection and authorized root tool instead. A computer
+address is a valid maintenance choice, not an engine configuration error.
+
+First identify the correct TV and check the recovery widget with
+`tools/recovery.py --host TV_IP --token-file PRIVATE_TOKEN_FILE status`. Keep the
+token file private. An unreachable endpoint means no service status is
+available; opening the Recovery widget can start it for diagnosis. A reported
+`sdbClosed` is a failed TV-local handshake, distinct from the expected `closed`
+response to an ordinary interactive SDB shell on some retail TVs. A cached
+engine snapshot is not live proof unless it is fresh and the service is active.
+
+For computer-assisted repair, use the computer address currently authorized by
+the TV, connect its SDB client, then use the supported root method to run the
+scoped service-start sequence shown above. Before starting, confirm the unit is
+inactive and there is no unmanaged copy of the engine. Do not install a second
+engine or change the saved On/Off setting. Afterward, verify an active unit,
+`enabled: true`, the expected foreground app, and checks increasing between two
+status reads. A successful service start without fresh checks does not establish
+that ad detection works. If the root method or capture library no longer matches
+the firmware, stop and revalidate compatibility before running old binaries.
+
+For genuinely unattended TV-only recovery, configure the widget and Host PC IP
+for localhost as described in [installation](INSTALL.md#4-enable-reboot-recovery),
+then perform a cold-boot test **without** opening either widget or invoking the
+computer root tool. Verify the recovery endpoint appears on its own, the root
+agent connects, and recognition resumes. If any step fails, that mode is not yet
+reliable on the device. The trigger for an unexpected TV reboot may be unknown
+even when the resulting recovery failure is clear.
+
 ## Validation
 
 ```sh

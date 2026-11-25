@@ -153,6 +153,9 @@ service connects to the TV's own SDB and reacquires root. Some firmware requires
 a restart for the host change to take effect. Normal computer SDB access stops;
 the protected recovery endpoint is independent of that connection. Require
 `rootConnected: true` and fresh engine status before declaring setup successful.
+If you keep Host PC IP set to the computer, skip the claim of unattended TV-only
+recovery and follow [computer-assisted recovery](RECOVERY.md#full-tv-reboot)
+after a full reboot. The current boot's engine does not require an IP change.
 On subsequent launches, the connected agent verifies and repairs its own flags.
 
 If recovery cannot connect, restore the computer Host PC IP through Developer

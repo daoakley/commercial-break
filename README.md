@@ -14,10 +14,14 @@ the enabled engine running.
 **Experimental, tested on one TV:** 2022 Samsung Frame QN65LS03BAFXZA,
 firmware T-PTMAKUC-1720.7, Tizen 6.5, .NET Core 3.1. This is source for a manually
 provisioned installation, not a Samsung Store app or a universal installer.
-The optional signed recovery widget starts after a full reboot, reacquires
-root through TV-local SDB and starts the existing engine. A power-cycle test on
-the listed model confirmed automatic startup and resumed recognition; allow
-roughly 90 seconds for startup. Other hardware/firmware remain unverified.
+The optional signed recovery widget can reacquire root through TV-local SDB and
+restart the engine after a full reboot **only when Developer Mode Host PC IP is
+`127.0.0.1` and the widget starts successfully**. A power-cycle test on the
+listed model confirmed this setup and resumed recognition in roughly 90 seconds.
+With Host PC IP set to a computer instead, the engine can run normally but a
+full reboot requires [computer-assisted recovery](tv-standalone/RECOVERY.md#full-tv-reboot).
+An installed widget or saved On setting alone does not prove reboot recovery.
+Other hardware/firmware remain unverified.
 
 ## How it works
 

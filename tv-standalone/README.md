@@ -15,9 +15,11 @@ disabled on fresh installations.
 
 The installed **Commercial Break** app provides **On**, **Off**, **Start debug
 recording**, and **Break screen** controls. Closing the controller leaves an
-enabled background engine running. The optional [boot recovery widget](recovery/README.md) restores privileged
-access and restarts the engine after a full reboot. The controller alone does
-not provide boot recovery.
+enabled background engine running. The optional [boot recovery widget](recovery/README.md)
+can restore privileged access and restart the engine after a full reboot when
+Developer Mode Host PC IP is `127.0.0.1` and the widget starts. With Developer
+Mode pointed at a computer, use [computer-assisted recovery](RECOVERY.md#full-tv-reboot)
+after a full reboot. The controller alone does not provide boot recovery.
 
 Open **Break screen**, choose a collection and scene, then select **Use this
 theme**. Browsing previews does not save. **Keep Original** previews the original
