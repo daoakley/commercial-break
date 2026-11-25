@@ -45,6 +45,45 @@ add('wrong confidence source rejected', s, 'uncertain')
 s = copy.deepcopy(r); f = copy.deepcopy(s['result']['acr']['result_frames'][0]); f['tvt']['utc'] = '900'; f['dist'] = 50; s['result']['acr']['result_frames'].append(f)
 add('mixed-timestamp confidence rejected', s, 'uncertain')
 
+# Every direct association must be dated, even if a sibling frame is current.
+for timestamp in (None, {}, {'utc': None}, {'utc': 1000}, {'utc': '900'}):
+    r = response()
+    frame = copy.deepcopy(r['result']['acr']['result_frames'][0])
+    r['result']['acr']['result_frames'][0]['main'] = {'vid': 999, 'content': {'type': 'PROGRAM'}}
+    if timestamp is None:
+        del frame['tvt']
+    else:
+        frame['tvt'] = timestamp
+    r['result']['acr']['result_frames'].append(frame)
+    add('undated/stale sibling cannot lend its ad ID', r, 'uncertain')
+
+# An invalid candidate cannot hide a separate valid candidate.
+for invalid in ({'vid': 456}, {'vid': 456, 'content': None},
+                {'vid': 456, 'content': {'type': 1}}, None, [], 'invalid'):
+    r = response()
+    ad = copy.deepcopy(r['result']['acr']['recog_content']['main'])
+    r['result']['acr']['result_frames'][0]['multi'] = [{'vid': 456}]
+    r['result']['acr']['recog_content']['main'] = invalid
+    r['result']['acr']['recog_content']['multi'] = [ad]
+    add('valid ad after malformed sibling', r, 'ad')
+
+for invalid in (None, {}, [], {'matching': True, 'dist': None},
+                {'matching': True, 'dist': 2, 'tvt': {'utc': '1000'}, 'main': None}):
+    r = response()
+    r['result']['acr']['result_frames'].insert(0, invalid)
+    add('valid direct ad after malformed frame', r, 'ad')
+
+for missing in ('tvt', 'main', 'matching', 'dist'):
+    r = response()
+    del r['result']['acr']['result_frames'][0][missing]
+    # Remove independent aggregate proof: exercise the direct association only.
+    del r['result']['acr']['recog_content']['confidence']
+    add('incomplete sole frame cannot authorize ad: ' + missing, r, 'uncertain')
+
+r = response(); r['result']['acr']['recog_content']['main'] = {'vid': None, 'content': {'type': 'AD'}}
+r['result']['acr']['result_frames'][0]['main'] = {'vid': None}
+add('null identities cannot match', r, 'uncertain')
+
 root = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as td:
     path = Path(td) / 'cases.json'

@@ -11,6 +11,10 @@ the [Sponsored-pill detector](SPONSORED_PILL.md) and an optional
 requires network access. The [audio experiment](AUDIO_SPLICE.md) is optional and
 disabled on fresh installations.
 
+The [detection pipeline](DETECTION_PIPELINE.md) keeps uncovered local checks
+running while Samsung recognition waits or backs off. It rejects stale results
+after navigation and provides bounded scalar timing diagnostics.
+
 ## Controls and appearance
 
 The installed **Commercial Break** app provides **On**, **Off**, **Start debug
@@ -140,6 +144,7 @@ python3 tv-standalone/tests/test_youtube_evidence.py /path/to/dotnet
 python3 tv-standalone/tests/test_verdicts.py /path/to/dotnet
 python3 tv-standalone/tests/test_pill_evidence.py /path/to/dotnet
 python3 tv-standalone/tests/test_layout_evidence.py /path/to/dotnet
+dotnet run --project tv-standalone/tests/pipeline/PipelineTests.csproj
 ```
 
 Theme harnesses use .NET 6 on the development computer. Additional pixel/model

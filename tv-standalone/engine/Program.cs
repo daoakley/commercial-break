@@ -5,11 +5,10 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
-using System.Net.WebSockets;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
-class Program {
+partial class Program {
  const string Home="/opt/usr/home/owner/commercial-block", State="/run/commercial-block";
  static readonly object Gate=new object();
  static bool Enabled=false, Covered=false, OwnMute=false;
@@ -83,7 +82,7 @@ class Program {
  static long AudioArmedUntil=0, AudioArms=0, AudioArmHits=0;
  static string AudioFloor(){try{string v=File.ReadAllText(Home+"/audio-floor").Trim();double f=double.Parse(v,System.Globalization.CultureInfo.InvariantCulture);return f<=-60&&f>=-100?v:"-75";}catch{return "-75";}}
  static void AudioPoll(){lock(Gate){
-  if(AudioMode==0)return;AudioReady();
+  if(AudioMode==0||MaintenancePaused)return;AudioReady();
   try{var st=JsonDocument.Parse(File.ReadAllText(State+"/audio-splice-state.json")).RootElement;LastAudioStateAt=st.GetProperty("at").GetInt64();AudioSilent=st.GetProperty("silent").GetBoolean();if(Now()-AudioStarted>600000)AudioFailures=0;}catch{}
   JsonElement row;long decision;
   try{row=JsonDocument.Parse(File.ReadAllText(State+"/audio-splice.json")).RootElement.Clone();decision=row.GetProperty("decisionMs").GetInt64();}catch{return;}
@@ -92,14 +91,14 @@ class Program {
   long quietMs=LastAudioTriggerAt==0?long.MaxValue:now-LastAudioTriggerAt;AudioTriggers++;LastAudioTriggerAt=now;
   string info="audio splice trigger";try{info="null "+row.GetProperty("durMs").GetInt64()+" ms to "+row.GetProperty("floorDb").GetDouble().ToString("F0",System.Globalization.CultureInfo.InvariantCulture)+" dBFS, post mid/side "+row.GetProperty("postMidSideDb").GetDouble().ToString("F1",System.Globalization.CultureInfo.InvariantCulture)+" dB, decided "+(now-decision)+" ms ago";}catch{}
   Record("audio-splice",info+(Covered?"; already covered":""));
-  if(AudioMode==2&&Enabled&&!AudioSilent&&!Covered&&LastApp=="com.samsung.tv.cobalt-yttv"&&!OtherActive()&&Now()-NavigationAt()>=3000){
+  if(AudioMode==2&&Enabled&&!AudioSilent&&!Covered&&LastApp=="com.samsung.tv.cobalt-yttv"&&App()==LastApp&&decision>=NavigationAt()&&!(ArtMode=="on"&&now-ArtObserved<6000)&&!OtherActive()&&Now()-NavigationAt()>=3000){
    long quietNeed=AudioSetting("audio-quiet",60,0,3600)*1000,cool=AudioSetting("audio-cooldown",300,0,3600)*1000;
    if(quietMs<quietNeed){AudioSuppressed++;Record("audio-suppressed","previous trigger "+(quietMs/1000)+" s ago, quiet gate "+(quietNeed/1000)+" s");return;}
    if(LastUnconfirmedAudioAt>0&&now-LastUnconfirmedAudioAt<cool){AudioSuppressed++;Record("audio-suppressed","cool-down: unconfirmed audio cover "+((now-LastUnconfirmedAudioAt)/1000)+" s ago, gate "+(cool/1000)+" s");return;}
-   LastMatchSource="audio-splice";LastAd=Now();Cover();
+   ActiveCaptureId=Timing.Begin();ActiveCaptureStarted=DetectionTiming.Clock;LastMatchSource="audio-splice";LastAd=Now();Cover();
    if(Covered){AudioCovers++;Message="Audio splice — awaiting confirmation";Record("audio-cover","cover on audio splice; releases after 8 s without a confirming match");Next=0;}
   }
-  if(AudioMode==3&&Enabled&&!AudioSilent&&!Covered&&LastApp=="com.samsung.tv.cobalt-yttv"&&!OtherActive()&&Now()-NavigationAt()>=3000&&now>=AudioArmedUntil){
+  if(AudioMode==3&&Enabled&&!AudioSilent&&!Covered&&LastApp=="com.samsung.tv.cobalt-yttv"&&App()==LastApp&&decision>=NavigationAt()&&!(ArtMode=="on"&&now-ArtObserved<6000)&&!OtherActive()&&Now()-NavigationAt()>=3000&&now>=AudioArmedUntil){
    long arm=AudioSetting("audio-arm",5,1,30);AudioArmedUntil=now+arm*1000;AudioArms++;Next=0;Record("audio-armed","burst recognition for "+arm+" s while uncovered");
   }
  }}
@@ -158,7 +157,7 @@ class Program {
  static long LastAd=0, Queries=0, Matches=0, LastNavigation=0, Generation=0;
  static string Message="Off", LastApp="", Stage="idle", LastError="";
  static JsonElement Config;
- static ClientWebSocket Socket;
+
  static Process Overlay, Navigation, Watchdog;
  static string Token;
  static DebugRecords Debug;
@@ -170,7 +169,7 @@ class Program {
  static async Task ArtMonitor(){using(var http=new System.Net.Http.HttpClient(){Timeout=TimeSpan.FromMilliseconds(500)}){while(true){try{string text=await http.GetStringAsync("http://127.0.0.1:47791/status");if(text.Length<262144){var d=JsonDocument.Parse(text).RootElement;string mode=d.GetProperty("guard").GetProperty("artMode").GetString();ArtMode=mode=="on"||mode=="off"?mode:"unknown";ArtObserved=Now();}}catch{ArtMode="unknown";}await Task.Delay(2000);}}}
 
  static readonly Queue<object> BreakHistory=new Queue<object>();
- sealed class PendingDebug { public DebugRecords.Ticket ticket; public object before; public string app,mode,error,verdict; public long navigation,generation,captureStarted,requestAt,responseAt; public JsonElement? fingerprint,response,pill,layout,youtube; public object diagnostics; }
+ sealed class PendingDebug { public DebugRecords.Ticket ticket; public object before; public string app,mode,error,verdict; public long navigation,generation,captureStarted,requestAt,responseAt; public bool remotePending; public JsonElement? fingerprint,response,pill,layout,youtube; public object diagnostics; }
  static readonly List<PendingDebug> Pending=new List<PendingDebug>();
  static object Unknown(string reason)=>new{value=(string)null,source="unavailable",confidence=(double?)null,reason};
  static object Context()=>new{
@@ -179,9 +178,9 @@ class Program {
   source=new{configuredTvSource=Config.GetProperty("identity").GetProperty("sourceInfo").ToString(),authority="Device configuration; not proof of current channel"},
   ads=new{lastAcceptedMatchAt=LastAccepted==0?(long?)null:LastAccepted,secondsSinceLastMatch=LastAccepted==0?(double?)null:(Now()-LastAccepted)/1000.0,currentCoverStartedAt=CoverSince==0?(long?)null:CoverSince,currentCoverDurationSeconds=CoverSince==0?(double?)null:(Now()-CoverSince)/1000.0,observedCoverIntervals=BreakHistory.ToArray(),actualLastAdStart=Unknown("Cover timing is detection timing, not ground-truth ad onset"),expectedNextAd=Unknown("No validated prediction in TV-only engine")},
   audio=new{mode=AudioMode,triggers=AudioTriggers,covers=AudioCovers,lastTriggerAt=LastAudioTriggerAt==0?(long?)null:LastAudioTriggerAt,tapSilent=AudioSilent,rule="deep75_60-1500ms_post_not_mono"},
-  controls=new{enabled=Enabled,covered=Covered,ownedMute=OwnMute},counters=new{queries=Queries,matches=Matches,covers=Covers},software=new{app="Commercial Break",version="0.2.5",initialCheckTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),releaseAfterLastMatchMs=8000,queryType=1,fingerprintVersion="1.2",maxMatchDistance=15,aiUsed=false,localPreprocessor=IsRegularYouTube(LastApp)?YouTubeDetectionPolicy.Detector:"youtube-tv-sponsored-v1",youtubeAutoSkip=YouTubeAutoSkip,experimentalLayoutEnabled=LayoutEnabled,experimentalLayoutModel="forward-49-20261027"}};
- static void FlushDebug(){foreach(var p in Pending){Debug?.Complete(p.ticket,new{capture=new{captureStartedAt=p.captureStarted,fingerprintAt=p.fingerprint.HasValue&&p.fingerprint.Value.TryGetProperty("at",out var t)?(long?)t.GetInt64():null,mode=p.mode,imageWidth=480,imageHeight=270,imageContent=p.mode=="card-visible"?"cover card may obscure program; exclude from content labels":"underlying picture requested",imageAndFingerprintAreSeparateCapturePaths=true,diagnostics=p.diagnostics},localDetection=p.pill,youtubeControls=p.youtube,experimentalLayout=p.layout,fingerprint=p.fingerprint,samsung=new{requestAt=p.requestAt,responseAt=p.responseAt,roundTripMs=p.responseAt>0?(long?)(p.responseAt-p.requestAt):null,response=p.response,verdict=p.verdict,error=p.error},contextBefore=p.before,decision=new{evaluatedAt=Now(),sameSession=Enabled&&Generation==p.generation&&LastNavigation==p.navigation&&LastApp==p.app,covered=Covered,ownedMute=OwnMute,lastAcceptedAt=LastAccepted,reason=Message},contextAfter=Context()});}Pending.Clear();}
- static async Task DebugMaintenance(){while(true){try{Debug?.Maintain();}catch{}await Task.Delay(1000);}}
+  controls=new{enabled=Enabled,covered=Covered,ownedMute=OwnMute},counters=new{queries=Queries,matches=Matches,covers=Covers},software=new{app="Commercial Break",version=DetectionTiming.Version,build=Build,initialCheckTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),releaseAfterLastMatchMs=8000,queryType=1,fingerprintVersion="1.2",maxMatchDistance=15,aiUsed=false,localPreprocessor=IsRegularYouTube(LastApp)?YouTubeDetectionPolicy.Detector:"youtube-tv-sponsored-v1",youtubeAutoSkip=YouTubeAutoSkip,experimentalLayoutEnabled=LayoutEnabled,experimentalLayoutModel="forward-49-20261027"}};
+ static void FlushDebug(){foreach(var p in Pending.Where(item=>!item.remotePending).ToArray()){Debug?.Complete(p.ticket,new{capture=new{captureStartedAt=p.captureStarted,fingerprintAt=p.fingerprint.HasValue&&p.fingerprint.Value.TryGetProperty("at",out var t)?(long?)t.GetInt64():null,mode=p.mode,imageWidth=480,imageHeight=270,imageContent=p.mode=="card-visible"?"cover card may obscure program; exclude from content labels":"underlying picture requested",imageAndFingerprintAreSeparateCapturePaths=true,diagnostics=p.diagnostics},localDetection=p.pill,youtubeControls=p.youtube,experimentalLayout=p.layout,fingerprint=p.fingerprint,samsung=new{requestAt=p.requestAt,responseAt=p.responseAt,roundTripMs=p.responseAt>0?(long?)(p.responseAt-p.requestAt):null,response=p.response,verdict=p.verdict,error=p.error},contextBefore=p.before,decision=new{evaluatedAt=Now(),sameSession=Enabled&&Generation==p.generation&&LastNavigation==p.navigation&&LastApp==p.app,covered=Covered,ownedMute=OwnMute,lastAcceptedAt=LastAccepted,reason=Message},contextAfter=Context()});Pending.Remove(p);}}
+ static async Task DebugMaintenance(){while(true){try{Debug?.Maintain();Timing?.Flush();}catch{}await Task.Delay(1000);}}
 
  static long Now()=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
  static string Run(string file,string args,int timeout=2500) {
@@ -193,7 +192,7 @@ class Program {
  }
  static bool OtherActive(){try{return Now()-long.Parse(File.ReadAllText("/run/codex-commercial-muter/heartbeat").Trim())*1000<60000;}catch{return false;}}
  static string App(){try {string s=Run("/usr/bin/vconftool","get memory/appfw/current_fullscreen_appid");var i=s.IndexOf("value = ");return i<0?"":s.Substring(i+8).Split(' ')[0];}catch{return "";}}
- static void Release(string reason="reset"){lock(Gate){if(Covered&&CoverSource=="audio-splice"&&!AudioCoverConfirmed){LastUnconfirmedAudioAt=Now();AudioUnconfirmed++;Record("audio-unconfirmed","audio cover released after "+(Now()-CoverSince)+" ms without confirmation; cool-down "+AudioSetting("audio-cooldown",300,0,3600)+" s");}if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;CoverSource="none";Countdown.Reset();Next=0;Themes?.EndBreak();}}
+ static void Release(string reason="reset"){lock(Gate){if(Covered)Timing?.Record(CoverCaptureId,DetectionStage.Released,CoverCaptureStarted);RemoteNeedsMaskedCapture=false;if(Covered&&CoverSource=="audio-splice"&&!AudioCoverConfirmed){LastUnconfirmedAudioAt=Now();AudioUnconfirmed++;Record("audio-unconfirmed","audio cover released after "+(Now()-CoverSince)+" ms without confirmation; cool-down "+AudioSetting("audio-cooldown",300,0,3600)+" s");}if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;CoverSource="none";Countdown.Reset();Next=0;Themes?.EndBreak();}}
  static Process Spawn(string file,string args){return Process.Start(new ProcessStartInfo(file,args){UseShellExecute=false});}
  static Process SpawnScript(string script){var info=new ProcessStartInfo("/bin/sh"){UseShellExecute=false};info.ArgumentList.Add("-c");info.ArgumentList.Add(script);return Process.Start(info);}
  static void Prepare(){
@@ -211,37 +210,21 @@ class Program {
   Overlay.Dispose();Overlay=null;
  }
  static void PrepareBreakArtwork(){if(!Covered)Themes.BeginBreak();RefreshIdleOverlay();}
- static void Cover(){lock(Gate){if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;PrepareBreakArtwork();if(!Covered){CoverSince=Now();Covers++;CoverSource=LastMatchSource;AudioCoverConfirmed=false;bool armed=Now()<AudioArmedUntil;if(armed)AudioArmHits++;AudioArmedUntil=0;Record("cover","fresh ad match via "+LastMatchSource+(LastAudioDecision>0&&LastMatchSource!="audio-splice"&&Now()-LastAudioDecision<=30000?"; audio trigger decided "+(Now()-LastAudioDecision)+" ms earlier":"")+(armed?"; during audio burst":""));
+ static void Cover(){lock(Gate){bool newCover=!Covered;if(!Enabled||OtherActive()||Now()-NavigationAt()<3000)return;PrepareBreakArtwork();if(!Covered){CoverSince=Now();Covers++;CoverSource=LastMatchSource;AudioCoverConfirmed=false;bool armed=Now()<AudioArmedUntil;if(armed)AudioArmHits++;AudioArmedUntil=0;Record("cover","fresh ad match via "+LastMatchSource+(LastAudioDecision>0&&LastMatchSource!="audio-splice"&&Now()-LastAudioDecision<=30000?"; audio trigger decided "+(Now()-LastAudioDecision)+" ms earlier":"")+(armed?"; during audio burst":""));
   string mute=Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager GetSpeakerMute");
   if(mute.Trim()=="ii 0 0"){File.WriteAllText(State+"/owned-mute","1");Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b true");OwnMute=true;}
+ }if(newCover){
+  CoverCaptureId=ActiveCaptureId;CoverCaptureStarted=ActiveCaptureStarted;CoverReceiptSeen=false;
+  Timing?.Record(CoverCaptureId,DetectionStage.MuteCompleted,CoverCaptureStarted);
+  try{File.WriteAllText(State+"/overlay-lease.request",CoverCaptureId+" "+CoverCaptureStarted);}catch(IOException error){Health?.Error("timing-request",error);}
  }File.WriteAllText(State+"/overlay-lease",Now().ToString());
+ if(newCover)Timing?.Record(CoverCaptureId,DetectionStage.CoverRequested,CoverCaptureStarted);
  if(Overlay==null||Overlay.HasExited){CoverTheme=Themes.EffectiveTheme;Overlay=Spawn("/usr/bin/dotnet",Home+"/CommercialOverlayProbe.dll --seconds 0 --scene "+Themes.ResolveScene()+" --lease-file "+State+"/overlay-lease --pause-file "+State+"/overlay-pause --paused-ack-file "+State+"/overlay-paused-ack --standby-file "+State+"/heartbeat --navigation-file "+State+"/navigation");}
  Covered=true;}}
  static void Save(){EngineHealth.SaveEnabled(Home,Enabled);}
- static void Disable(string why){lock(Gate){Enabled=false;Generation++;Save();Debug?.Set(false);StopLayoutWorker();StopAudio();Release(why);foreach(var p in new[]{Overlay,Navigation,Watchdog})try{if(p!=null&&!p.HasExited)p.Kill();}catch{}File.Delete(State+"/heartbeat");Message=why;}}
- static bool IsAd(JsonElement response,string at){
-  try{
-   var acr=response.GetProperty("result").GetProperty("acr");var rc=acr.GetProperty("recog_content");
-   if(!rc.GetProperty("matching").GetBoolean())return false;
-   var matched=acr.GetProperty("result_frames").EnumerateArray().Where(f=>f.GetProperty("matching").GetBoolean()).ToList();
-   var frames=matched.Where(f=>f.GetProperty("dist").GetInt32()>=0&&f.GetProperty("dist").GetInt32()<=15).ToList();
-   if(frames.Count==0||!frames.Any(f=>f.TryGetProperty("tvt",out var ft)&&ft.GetProperty("utc").GetString()==at))return false;
-   var candidates=new List<JsonElement>{rc.GetProperty("main")};candidates.AddRange(rc.GetProperty("multi").EnumerateArray());
-   var ids=new HashSet<string>();
-   foreach(var f in frames){if(f.TryGetProperty("tvt",out var ft)&&ft.GetProperty("utc").GetString()!=at)continue;foreach(var c in new[]{f.GetProperty("main")}.Concat(f.GetProperty("multi").EnumerateArray()))if(c.TryGetProperty("vid",out var v))ids.Add(v.ToString());}
-   foreach(var c in candidates)if(c.TryGetProperty("vid",out var v)&&ids.Contains(v.ToString())&&c.GetProperty("content").GetProperty("type").GetString()=="AD")return true;
-   if(matched.Any(f=>!f.TryGetProperty("tvt",out var ft)||ft.GetProperty("utc").GetString()!=at)||!rc.TryGetProperty("confidence",out var conf)||rc.GetProperty("tvt").GetProperty("utc").GetString()!=at||conf.GetProperty("tvt").GetProperty("utc").GetString()!=at)return false;
-   var cc=new HashSet<string>(conf.GetProperty("cc").EnumerateArray().Where(c=>c.GetProperty("source").GetInt32()==4&&c.GetProperty("keepCnt").GetInt32()==0).Select(c=>c.GetProperty("vid").ToString()));
-   return candidates.Any(c=>c.GetProperty("source").GetInt32()==4&&cc.Contains(c.GetProperty("vid").ToString())&&c.GetProperty("content").GetProperty("type").GetString()=="AD"&&c.GetProperty("content").GetProperty("ccType").GetString()=="AD");
-  }catch{return false;}
- }
- static async Task<JsonElement> Exchange(object request){
-  var data=Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request));using(var stop=new CancellationTokenSource(2500)){
-   await Socket.SendAsync(new ArraySegment<byte>(data),WebSocketMessageType.Text,true,stop.Token);
-   using(var all=new MemoryStream()){var b=new byte[32768];WebSocketReceiveResult r;do{r=await Socket.ReceiveAsync(new ArraySegment<byte>(b),stop.Token);if(r.MessageType!=WebSocketMessageType.Text)throw new IOException("socket closed");all.Write(b,0,r.Count);if(all.Length>1048576)throw new IOException("response too large");}while(!r.EndOfMessage);return JsonDocument.Parse(all.ToArray()).RootElement.Clone();}
-  }
- }
- static async Task<bool> Recognize(bool keepCard=false){
+ static void Disable(string why){lock(Gate){SamsungLane.Cancel();Enabled=false;Generation++;Save();Debug?.Set(false);StopLayoutWorker();StopAudio();Release(why);foreach(var p in new[]{Overlay,Navigation,Watchdog})try{if(p!=null&&!p.HasExited)p.Kill();}catch{}File.Delete(State+"/heartbeat");Message=why;}}
+ static bool IsAd(JsonElement response,string at)=>SamsungVerdict.IsAd(response,at);
+ static async Task<bool> Recognize(EvidenceSession session,long captureId,bool keepCard=false){
   YouTubeSkipFrame=0;TimerEvidence=null;
   CaptureMode=Covered?(keepCard?"card-visible":"panel-masked"):"normal";
   var ticket=Debug?.Begin();PendingDebug debug=null;
@@ -250,11 +233,13 @@ class Program {
   bool broadcastChecks=IsYouTubeTv(LastApp);
   bool youtubeOnly=YouTubeDetectionPolicy.LocalOnly(LastApp);
   bool layoutRequested=broadcastChecks&&!keepCard&&LayoutReady();
+  bool samsungEligible=broadcastChecks&&SamsungLane.Ready(DetectionTiming.Clock);
   Stage="capture";long captureStarted=Now();File.Delete(State+"/youtube-ui.json");File.Delete(State+"/sponsored-pill.json");File.Delete(State+"/layout-result.json");File.WriteAllText(State+"/acr-next-capture",(Now()/1000).ToString());
   using(var p=new Process()){
    p.StartInfo=new ProcessStartInfo("/usr/bin/dotnet",Home+"/AcrFrameProbe.dll"){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
    p.StartInfo.Environment["LD_PRELOAD"]="/lib/libcapi-system-info.so.0:"+State+"/libtzcapturec-probe.so";
    p.StartInfo.Environment["CAPTURE_FINGERPRINT_ONLY"]="1";
+   p.StartInfo.Environment["CAPTURE_CHECK_FINGERPRINT"]=samsungEligible?"1":"0";
    p.StartInfo.Environment["CAPTURE_CHECK_SPONSORED"]=broadcastChecks?"1":"0";
    p.StartInfo.Environment["CAPTURE_CHECK_YOUTUBE"]=IsRegularYouTube(LastApp)?"1":"0";
    p.StartInfo.Environment["CAPTURE_LOCAL_YOUTUBE_ONLY"]=youtubeOnly?"1":"0";
@@ -265,6 +250,7 @@ class Program {
    p.StartInfo.Environment["CAPTURE_OVERLAY_ACK_FILE"]=Covered?State+"/overlay-paused-ack":"";
    p.Start();var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();if(!p.WaitForExit(4000)){try{p.Kill();}catch{}throw new TimeoutException();}if(p.ExitCode!=0)throw new IOException("capture unavailable");
   }
+  Timing.Record(captureId,DetectionStage.CaptureFinished,session.Started);LastError="";
   if(debug!=null){try{debug.diagnostics=JsonDocument.Parse(File.ReadAllText(State+"/capture-diagnostics.json")).RootElement.Clone();}catch{}}
   try {
    var local=JsonDocument.Parse(File.ReadAllText(State+"/youtube-ui.json")).RootElement.Clone();
@@ -320,62 +306,114 @@ class Program {
    try{File.Delete(State+"/layout-frame.bin");}catch{}
    if(layoutRequested&&LayoutEnabled&&!layoutFresh&&++LayoutNoReplies>=3){LayoutError="three missing worker replies; experiment disabled";SetLayout(false);}
   }
-  Stage="connect";if(Socket==null||Socket.State!=WebSocketState.Open){Socket?.Dispose();Socket=new ClientWebSocket();using(var stop=new CancellationTokenSource(2500))await Socket.ConnectAsync(new Uri("wss://acr-us-prd.samsungcloud.tv/getacrinfo"),stop.Token);Stage="parameters";var p=await Exchange(Config.GetProperty("parameters"));if(p.GetProperty("server").GetProperty("fpVersion").GetDouble()!=1.2||!p.GetProperty("scte35Param").GetProperty("isMainQueryEnabled").GetBoolean())throw new IOException("recognition unavailable");}
-  Stage="fingerprint";var f=JsonDocument.Parse(Convert.FromBase64String(File.ReadAllText(State+"/acr-fingerprint"))).RootElement;
-  if(debug!=null){debug.fingerprint=f.Clone();try{debug.diagnostics=JsonDocument.Parse(File.ReadAllText(State+"/capture-diagnostics.json")).RootElement.Clone();}catch{}}
-  if(f.GetProperty("capture_rc").GetInt64()!=0||f.GetProperty("fingerprint_rc").GetInt64()!=0)throw new IOException("fingerprint unavailable");
-  long at=f.GetProperty("at").GetInt64();if(Now()-at>5000||at-Now()>2000)throw new IOException("stale capture");int n=f.GetProperty("roi_count").GetInt32();byte[] raw=Convert.FromBase64String(f.GetProperty("raw_base64").GetString());if(n<1||n>10||raw.Length!=180)throw new IOException("invalid capture");
-  var fps=new List<object>();for(int i=0;i<n;i++){var values=new List<uint>();for(int j=0;j<8;j+=2){int k=i*18+2+j*2;values.Add(((uint)BitConverter.ToUInt16(raw,k)<<16)|BitConverter.ToUInt16(raw,k+2));}fps.Add(new{roi=i,raws=values});}
-  var id=Config.GetProperty("identity");var am=new Dictionary<string,object>();foreach(string k in new[]{"psid","vdvendorcode","modelID"})am[k]=id.GetProperty(k).Clone();am["power"]=1;am["tv_source"]=int.Parse(id.GetProperty("sourceInfo").ToString());am["source_APP_Id"]=LastApp;
-  var frame=new{fps,tvt=new{utc=at.ToString(),tz=(int)TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).TotalMinutes}};
-  if(debug!=null)debug.requestAt=Now();
-  Stage="query";var result=await Exchange(new{api=1,search=new{msg_ver="3.3",am,acr=new{retry_cnt=0,mtype=1,fp_ver="1.200000",query_type=1,query=new[]{frame}}}});
-  if(debug!=null){debug.responseAt=Now();debug.response=result.Clone();}
-  File.WriteAllText(State+"/last-reply.json",JsonSerializer.Serialize(new{at=at.ToString(),receivedAt=Now(),captureMode=CaptureMode,response=result}));
-  if(!result.TryGetProperty("result",out var body)||!body.TryGetProperty("acr",out var acr))throw new IOException("invalid recognition reply");
-  Queries++;LastError="";Stage="reply";bool ad=IsAd(result,at.ToString());if(ad)LastMatchSource="samsung";Record("reply",ad?"ad":"unknown");if(debug!=null)debug.verdict=ad?"ad":"unknown";return ad;
+  if(!samsungEligible){Stage="local-only";if(debug!=null)debug.verdict="not_queried_samsung_busy_or_backoff";return false;}
+  Stage="fingerprint";
+  var fingerprint=JsonDocument.Parse(Convert.FromBase64String(File.ReadAllText(State+"/acr-fingerprint"))).RootElement.Clone();
+  if(fingerprint.GetProperty("capture_rc").GetInt64()!=0||fingerprint.GetProperty("fingerprint_rc").GetInt64()!=0)throw new IOException("fingerprint unavailable");
+  if(debug!=null)debug.fingerprint=fingerprint;
+  if(!session.Current(App(),Generation,NavigationAt(),DetectionTiming.Clock,Enabled&&!MaintenancePaused))return false;
+  var job=new RemoteRecognition{session=session,captureId=captureId,keepCard=keepCard,fingerprint=fingerprint,debug=debug,mode=CaptureMode};
+  if(SamsungLane.TryStart(DetectionTiming.Clock,token=>SamsungClient.Query(Config,fingerprint,session.App,token))){
+   RemoteJob=job;if(debug!=null)debug.remotePending=true;
+   Timing.Record(captureId,DetectionStage.RemoteSubmitted,session.Started);Stage="samsung-pending";
+  }
+  return false;
   }catch(Exception error){if(debug!=null)debug.error=Stage+": "+error.GetType().Name;throw;}
  }
  static long Next=0;
  static volatile bool MaintenancePaused=false,RecognitionInProgress=false;
- static async Task Loop(){int failures=0;
-  while(true){try{
-   Health.Pulse(Stage);
-   if(MaintenancePaused){Stage="maintenance";await Task.Delay(200);continue;}
-   if(!Enabled){await Task.Delay(500);continue;}
-   if(OtherActive()){Disable("Other blocker is active — remaining off");continue;}
-   Prepare();long navigation=NavigationAt();if(navigation!=LastNavigation){Release("navigation");LastNavigation=navigation;ContextSince=Now();}string app=App();if(app!=LastApp){Release("app change");LastApp=app;ContextSince=Now();Next=0;AudioArmedUntil=0;if(YouTubeDetectionPolicy.LocalOnly(app)){Socket?.Dispose();Socket=null;}}
-   if(ArtMode=="on"&&Now()-ArtObserved<6000){Release("Art Mode");Message="Paused in Art Mode";await Task.Delay(1000);continue;}
-   if(!IsSupportedApp(app)){Release("outside supported apps");Message="Waiting for YouTube or YouTube TV";await Task.Delay(1000);continue;}
-   File.WriteAllText(State+"/heartbeat",(Now()/1000).ToString());
-   lock(Gate){
-    bool timerLease=IsRegularYouTube(app)&&Countdown.KeepsCovered(Now());
-    if(Covered&&(!File.Exists(State+"/overlay-lease")||(!timerLease&&Now()-LastAd>=8000)))Release("ad renewal expired or lease removed");
-    // Renew from the live loop only. Never write a future lease or invent a match.
-    if(Covered&&timerLease){File.WriteAllText(State+"/overlay-lease",Now().ToString());if(Countdown.Waiting(Now()))Stage="youtube-countdown-hold";}
+ static async Task Loop()
+ {
+  int failures=0;
+  while(true)
+  {
+   try
+   {
+    Health.Pulse(Stage);
+    if(MaintenancePaused||!Enabled)
+    {
+     InvalidateRemote();FinishRemote(false,LastApp);
+     Stage=MaintenancePaused?"maintenance":"off";
+     await Task.Delay(200);continue;
+    }
+    if(OtherActive()){Disable("Other blocker is active — remaining off");continue;}
+    Prepare();
+    long navigation=NavigationAt();
+    if(navigation!=LastNavigation)
+    {
+     InvalidateRemote();Release("navigation");LastNavigation=navigation;ContextSince=Now();
+    }
+    string app=PollApp();
+    if(app!=LastApp)
+    {
+     InvalidateRemote();Release("app change");LastApp=app;ContextSince=Now();Next=0;AudioArmedUntil=0;
+    }
+    if(ArtMode=="on"&&Now()-ArtObserved<6000)
+    {
+     InvalidateRemote();FinishRemote(false,app);Release("Art Mode");Message="Paused in Art Mode";
+     await Task.Delay(1000);continue;
+    }
+    if(!IsSupportedApp(app))
+    {
+     InvalidateRemote();FinishRemote(false,app);Release("outside supported apps");Message="Waiting for YouTube or YouTube TV";
+     await Task.Delay(1000);continue;
+    }
+    File.WriteAllText(State+"/heartbeat",(Now()/1000).ToString());
+    ObserveOverlay();
+    lock(Gate)
+    {
+     bool timerLease=IsRegularYouTube(app)&&Countdown.KeepsCovered(Now());
+     if(Covered&&(!File.Exists(State+"/overlay-lease")||(!timerLease&&Now()-LastAd>=8000)))Release("ad renewal expired or lease removed");
+     if(Covered&&timerLease)
+     {
+      File.WriteAllText(State+"/overlay-lease",Now().ToString());
+      if(Countdown.Waiting(Now()))Stage="youtube-countdown-hold";
+     }
+    }
+    FinishRemote(true,app);
+    // A covered Samsung check can finish without repeatedly dropping its card.
+    // Uncovered local checks continue even while a remote operation is pending.
+    if(Covered&&IsYouTubeTv(app)&&SamsungLane.Busy&&!RemoteNeedsMaskedCapture)
+    {
+     await Task.Delay(50);continue;
+    }
+    if(DetectionTiming.Clock<Next&&!(!Covered&&Now()<AudioArmedUntil))
+    {
+     await Task.Delay(SamsungLane.Busy?50:100);continue;
+    }
+    var session=new EvidenceSession{App=app,Generation=Generation,Navigation=NavigationAt(),Started=DetectionTiming.Clock};
+    long captureId=Timing.Begin();
+    lock(Gate){if(MaintenancePaused||!Enabled)continue;RecognitionInProgress=true;}
+    bool steady=Covered&&IsYouTubeTv(app)&&!RemoteNeedsMaskedCapture&&SamsungLane.Ready(DetectionTiming.Clock);
+    if(Covered&&IsYouTubeTv(app)&&!steady)MaskedFallbacks++;
+    RemoteNeedsMaskedCapture=false;
+    Timing.Record(captureId,DetectionStage.CaptureStarted,session.Started);
+    bool ad=await Recognize(session,captureId,steady);
+    failures=0;
+    Next=session.Started+YouTubeDetectionPolicy.IntervalMs(app);
+    if(ad)
+    {
+     Timing.Record(captureId,DetectionStage.LocalPositive,session.Started);
+     AcceptAd(session,captureId);
+    }
+    else Message=Covered?"Waiting for another match":"Watching — no confirmed ad";
+    FinishRemote(true,app);
    }
-   if(Now()<Next&&!(!Covered&&Now()<AudioArmedUntil)){await Task.Delay(200);continue;}
-   long started=Now(), nav=NavigationAt(), generation=Generation;
-   lock(Gate){if(MaintenancePaused||!Enabled)continue;RecognitionInProgress=true;}
-   // YouTube uses one masked UI capture; only YouTube TV first tries a
-   // secure fingerprint with the existing card continuously
-   // visible. Only a strict, fresh AD verdict renews that cover. An uncertain
-   // result immediately falls back to the established masked capture path.
-   bool trySteady=Covered&&YouTubeDetectionPolicy.UsesSamsung(LastApp);bool ad=await Recognize(trySteady);
-   bool sameSession=Enabled&&generation==Generation&&nav==NavigationAt()&&App()==LastApp;
-   if(trySteady&&sameSession){
-    if(ad)SteadyCardMatches++;
-    else {MaskedFallbacks++;ad=await Recognize(false);}
+   catch(Exception error)
+   {
+    LastError=Stage+": "+error.GetType().Name+"/"+error.GetBaseException().GetType().Name;
+    Health.Error(Stage,error);Record("error",LastError);InvalidateRemote();Release("capture or control error");
+    failures++;if(failures>=5)throw new InvalidOperationException("Repeated local failures",error);
+    Next=DetectionTiming.Clock+500;Message="Capture unavailable — playback released";await Task.Delay(500);
    }
-   failures=0;Next=started+YouTubeDetectionPolicy.IntervalMs(LastApp);
-   lock(Gate){if(!Enabled||generation!=Generation)continue;if(App()!=LastApp||nav!=NavigationAt()){Release("navigation during query");Record("discard","navigation during query");continue;}if(ad){if(TryYouTubeSkip(nav,generation))continue;Matches++;LastAccepted=LastAd=Now();if(Covered&&CoverSource=="audio-splice"){Record("confirm",LastMatchSource+" confirmed the audio cover after "+(Now()-CoverSince)+" ms");CoverSource=LastMatchSource;AudioCoverConfirmed=true;}Cover();Message="Commercial matched";
-    if(IsRegularYouTube(LastApp)&&Covered&&Countdown.Observe(TimerEvidence,Now())){
-     Next=Countdown.CheckAt;CountdownHolds++;Message="YouTube countdown — card held steady";
-     Record("youtube-countdown-hold","timer "+Countdown.Seconds+"–"+Countdown.MaxSeconds+" s; next check in "+(Next-Now())+" ms");
-    }}else Message=Covered?"Waiting for another match":"Watching — no confirmed ad";}
-  }catch(Exception error){LastError=Stage+": "+error.GetType().Name+"/"+error.GetBaseException().GetType().Name;Health.Error(Stage,error);Record("error",LastError);Release("recognition error");Socket?.Dispose();Socket=null;failures++;if(failures>=5)throw new InvalidOperationException("Repeated recognition failures",error);Next=Now()+(YouTubeDetectionPolicy.LocalOnly(LastApp)?500:Math.Min(60000,2000*(1<<Math.Min(failures,5))));Message="Recognition unavailable — playback released";await Task.Delay(500);}finally{try{FlushDebug();}catch{Pending.Clear();}finally{RecognitionInProgress=false;}}}
+   finally
+   {
+    try{FlushDebug();}catch{Pending.RemoveAll(item=>!item.remotePending);}
+    RecognitionInProgress=false;
+   }
+  }
  }
- static object Status()=>new{health=Health?.Status(),enabled=Enabled,maintenancePaused=MaintenancePaused,recognitionInProgress=RecognitionInProgress,covered=Covered,otherActive=OtherActive(),message=Message,stage=Stage,lastError=LastError,lastAcceptedAt=LastAccepted,covers=Covers,captureMode=CaptureMode,steadyCardMatches=SteadyCardMatches,maskedFallbacks=MaskedFallbacks,queries=Queries,matches=Matches,foregroundApp=LastApp,supportedApp=IsSupportedApp(LastApp),engine="YouTube: local countdown/Skip only; YouTube TV: Samsung + broadcast rules",samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),checkTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),youtubeUi=new{checks=YouTubeChecks,hits=YouTubeHits,state=LastYouTubeUi,lastMillis=LastYouTubeMillis,automaticSkip=YouTubeAutoSkip,skipAttempts=YouTubeSkipAttempts,skipStatus=YouTubeSkipStatus,lastSkipAttemptAt=SkipGuard?.LastAttempt,countdown=new{seconds=Countdown.Seconds,maxSeconds=Countdown.MaxSeconds,holding=Covered&&Countdown.Waiting(Now()),checkAt=Countdown.CheckAt,checkInMs=Covered?Math.Max(0,Countdown.CheckAt-Now()):0,holds=CountdownHolds}},layout=new{enabled=LayoutEnabled,checks=LayoutChecks,hits=LayoutHits,lastScore=LastLayoutScore,lastMillis=LastLayoutMillis,lastModel=LastLayoutModel,error=LayoutError,threshold=0.5,experimental=true},localChecks=LocalChecks,localHits=LocalHits,lastPillScore=LastPillScore,lastPillMillis=LastPillMillis,lastMatchSource=LastMatchSource,releaseSeconds=8,persistentApp=true,rebootReady=false,audio=new{mode=AudioMode,shadow=AudioMode==1,triggers=AudioTriggers,covers=AudioCovers,lastTriggerAt=LastAudioTriggerAt==0?(long?)null:LastAudioTriggerAt,tapSilent=AudioSilent,lastStateAt=LastAudioStateAt==0?(long?)null:LastAudioStateAt,observerAlive=Audio!=null&&!Audio.HasExited,error=AudioError,floorDb=AudioFloor(),quietSeconds=AudioSetting("audio-quiet",60,0,3600),cooldownSeconds=AudioSetting("audio-cooldown",300,0,3600),unconfirmed=AudioUnconfirmed,suppressed=AudioSuppressed,armSeconds=AudioSetting("audio-arm",5,1,30),arms=AudioArms,armHits=AudioArmHits,armed=Now()<AudioArmedUntil,rule="null 60-1500 ms at or below floor, then non-mono audio; decision 1 s after the null"},appearance=new{theme=Themes?.Selected??"default",effectiveTheme=Themes?.EffectiveTheme??"default",activeTheme=Covered?CoverTheme:null},debug=Debug?.Status()};
+ static object Status()=>new{build=Build,timing=Timing?.Status(),samsungLane=SamsungLane.Status(DetectionTiming.Clock),samsungError=SamsungError,health=Health?.Status(),enabled=Enabled,maintenancePaused=MaintenancePaused,recognitionInProgress=RecognitionInProgress,covered=Covered,otherActive=OtherActive(),message=Message,stage=Stage,lastError=LastError,lastAcceptedAt=LastAccepted,covers=Covers,captureMode=CaptureMode,steadyCardMatches=SteadyCardMatches,maskedFallbacks=MaskedFallbacks,queries=Queries,matches=Matches,foregroundApp=LastApp,supportedApp=IsSupportedApp(LastApp),engine="YouTube: local countdown/Skip only; YouTube TV: Samsung + broadcast rules",samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),checkTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),youtubeUi=new{checks=YouTubeChecks,hits=YouTubeHits,state=LastYouTubeUi,lastMillis=LastYouTubeMillis,automaticSkip=YouTubeAutoSkip,skipAttempts=YouTubeSkipAttempts,skipStatus=YouTubeSkipStatus,lastSkipAttemptAt=SkipGuard?.LastAttempt,countdown=new{seconds=Countdown.Seconds,maxSeconds=Countdown.MaxSeconds,holding=Covered&&Countdown.Waiting(Now()),checkAt=Countdown.CheckAt,checkInMs=Covered?Math.Max(0,Countdown.CheckAt-Now()):0,holds=CountdownHolds}},layout=new{enabled=LayoutEnabled,checks=LayoutChecks,hits=LayoutHits,lastScore=LastLayoutScore,lastMillis=LastLayoutMillis,lastModel=LastLayoutModel,error=LayoutError,threshold=0.5,experimental=true},localChecks=LocalChecks,localHits=LocalHits,lastPillScore=LastPillScore,lastPillMillis=LastPillMillis,lastMatchSource=LastMatchSource,releaseSeconds=8,persistentApp=true,rebootReady=false,audio=new{mode=AudioMode,shadow=AudioMode==1,triggers=AudioTriggers,covers=AudioCovers,lastTriggerAt=LastAudioTriggerAt==0?(long?)null:LastAudioTriggerAt,tapSilent=AudioSilent,lastStateAt=LastAudioStateAt==0?(long?)null:LastAudioStateAt,observerAlive=Audio!=null&&!Audio.HasExited,error=AudioError,floorDb=AudioFloor(),quietSeconds=AudioSetting("audio-quiet",60,0,3600),cooldownSeconds=AudioSetting("audio-cooldown",300,0,3600),unconfirmed=AudioUnconfirmed,suppressed=AudioSuppressed,armSeconds=AudioSetting("audio-arm",5,1,30),arms=AudioArms,armHits=AudioArmHits,armed=Now()<AudioArmedUntil,rule="null 60-1500 ms at or below floor, then non-mono audio; decision 1 s after the null"},appearance=new{theme=Themes?.Selected??"default",effectiveTheme=Themes?.EffectiveTheme??"default",activeTheme=Covered?CoverTheme:null},debug=Debug?.Status()};
  static async Task Serve(){var h=new HttpListener();h.Prefixes.Add("http://127.0.0.1:18764/");h.Start();while(true){var c=await h.GetContextAsync();try{
   c.Response.Headers.Add("Access-Control-Allow-Origin","*");c.Response.Headers.Add("Access-Control-Allow-Methods","GET, POST, OPTIONS");c.Response.Headers.Add("Access-Control-Allow-Headers","Authorization, Content-Type");
   if(c.Request.HttpMethod=="OPTIONS"){c.Response.StatusCode=204;c.Response.Close();continue;}
@@ -383,7 +421,7 @@ class Program {
   if(c.Request.Url.AbsolutePath=="/maintenance"&&c.Request.HttpMethod=="POST"){
    if(c.Request.ContentLength64<1||c.Request.ContentLength64>128){c.Response.StatusCode=400;c.Response.Close();continue;}
    var body=JsonDocument.Parse(await new StreamReader(c.Request.InputStream).ReadToEndAsync()).RootElement;
-   lock(Gate){MaintenancePaused=body.GetProperty("paused").GetBoolean();Generation++;Next=0;if(MaintenancePaused)Release("maintenance");Message=MaintenancePaused?"Maintenance paused; waiting for capture to finish":"Maintenance complete";}
+   lock(Gate){MaintenancePaused=body.GetProperty("paused").GetBoolean();Generation++;Next=0;if(MaintenancePaused){SamsungLane.Cancel();Release("maintenance");}Message=MaintenancePaused?"Maintenance paused; waiting for capture to finish":"Maintenance complete";}
   }else if(c.Request.Url.AbsolutePath=="/appearance"&&c.Request.HttpMethod=="POST"){
    if(c.Request.ContentLength64<1||c.Request.ContentLength64>128){c.Response.StatusCode=400;c.Response.Close();continue;}
    var body=JsonDocument.Parse(await new StreamReader(c.Request.InputStream).ReadToEndAsync()).RootElement;
@@ -418,7 +456,7 @@ class Program {
   if(args.Length==2&&args[0]=="--replay-pill"){foreach(var item in JsonDocument.Parse(File.ReadAllText(args[1])).RootElement.EnumerateArray())Console.WriteLine(IsPill(item.GetProperty("evidence"),item.GetProperty("started").GetInt64(),item.GetProperty("now").GetInt64(),item.GetProperty("keepCard").GetBoolean(),item.TryGetProperty("app",out var app)?app.GetString():"com.samsung.tv.cobalt-yttv")?"ad":"uncertain");return 0;}
   if(args.Length==3&&args[0]=="--classify"){Console.WriteLine(IsAd(JsonDocument.Parse(File.ReadAllText(args[1])).RootElement,args[2])?"ad":"uncertain");return 0;}
   if(args.Length==2&&args[0]=="--replay"){foreach(var item in JsonDocument.Parse(File.ReadAllText(args[1])).RootElement.EnumerateArray())Console.WriteLine(IsAd(item.GetProperty("response"),item.GetProperty("at").GetString())?"ad":"uncertain");return 0;}
-  Health=new EngineHealth(Home,State);
+  Health=new EngineHealth(Home,State);Timing=new DetectionTiming(Home);Build=DetectionTiming.BuildIdentity();
   SkipGuard=new YouTubeSkipGuard(ReadSkipAttempt());try{YouTubeAutoSkip=File.ReadAllText(Home+"/youtube-skip-enabled").Trim()=="1";}catch{}YouTubeSkipStatus=YouTubeAutoSkip?"ready":"off";
   AppDomain.CurrentDomain.UnhandledException+=(sender,eventArgs)=>Health.Error("unhandled",eventArgs.ExceptionObject as Exception);
   bool acquired=false;

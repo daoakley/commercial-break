@@ -13,8 +13,9 @@ recognition still requires its existing network service.
   retry delays all continue producing health pulses.
 - A faulted or unexpectedly completed permanent background task now terminates
   the engine instead of silently leaving the controller showing On.
-- Five consecutive recognition exceptions recycle the engine. An ordinary
-  uncertain recognition result is not a failure and never triggers recovery.
+- Five consecutive native capture/control exceptions recycle the engine.
+  Samsung network failures use an independent bounded backoff while local
+  detection continues. An ordinary uncertain result is not a failure.
 - The system service restarts the supervisor itself if it exits. Its control
   group contains the engine and helpers, so restart removes orphan capture,
   renderer, navigation and classifier processes.

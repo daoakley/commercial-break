@@ -176,6 +176,7 @@ internal static class Program
             bool youtubeChecked = false;
             byte[] layoutRgb = null;
             bool layoutQueued=false;
+            bool returnAcknowledged=true;
             try
             {
                 if (cardActive)
@@ -191,7 +192,13 @@ internal static class Program
                             Thread.Sleep(PanelDarkLeadMillis);
                         }
                     }
-                    // 2. Hide the card; the overlay acknowledges when it is gone.
+                    if (!masked.IsRunning || !PanelMaskWanted())
+                    {
+                        Console.Error.WriteLine("panel_mask_unavailable");
+                        Console.WriteLine("rc=-102 width=0 height=0 backend=acr");
+                        return 1;
+                    }
+                    // 2. Hide the card only after physical blanking is verified.
                     File.Delete(ackFile);
                     uncovered.Start();
                     File.WriteAllText(pauseFile, "pause");
@@ -247,7 +254,7 @@ internal static class Program
                         File.Move(pathResult+".tmp",pathResult,true);youtubeHit=result.hit;youtubeChecked=true;
                     } catch { /* A local check failure falls back to Samsung recognition. */ }
                 }
-                if (rc == 0 && !youtubeOnly && !pillHit && !youtubeHit) SecureFingerprint.TryCaptureDue(imageAt);
+                if (rc == 0 && !youtubeOnly && !pillHit && !youtubeHit && Environment.GetEnvironmentVariable("CAPTURE_CHECK_FINGERPRINT") != "0") SecureFingerprint.TryCaptureDue(imageAt);
             }
             finally
             {
@@ -256,8 +263,16 @@ internal static class Program
                     // 4. Card back, wait for its acknowledgement, then the return margin, then panel on.
                     File.Delete(pauseFile);
                     for (int i = 0; File.Exists(ackFile) && i < 100; i++) Thread.Sleep(10);
+                    returnAcknowledged = !File.Exists(ackFile);
                     uncovered.Stop();
                     if (masked.IsRunning) Thread.Sleep(PanelCardReturnMillis);
+                }
+                if (rescue != null && !returnAcknowledged && PanelMaskWanted())
+                {
+                    // Keep the independent four-second rescue alive. A missing
+                    // renderer acknowledgement must not immediately expose the ad.
+                    rescue.Dispose();
+                    rescue = null;
                 }
                 if (rescue != null)
                 {
@@ -269,6 +284,12 @@ internal static class Program
                     if (panel == 0 && !rescue.HasExited) { try { rescue.Kill(); } catch (InvalidOperationException) { } }
                     rescue.Dispose();
                 }
+            }
+            if (!returnAcknowledged)
+            {
+                Console.Error.WriteLine("overlay_return_timeout");
+                Console.WriteLine("rc=-103 width=0 height=0 backend=acr");
+                return 1;
             }
             int width = Marshal.ReadInt32(parameter, 0x08), height = Marshal.ReadInt32(parameter, 0x0c), pitch = Marshal.ReadInt32(parameter, 0x2c);
             if (rc != 0)
@@ -304,7 +325,7 @@ internal static class Program
                         panelMaskMillis = masked.ElapsedMilliseconds,
                         totalMillis = clock.ElapsedMilliseconds
                     }));
-                if(!debugImage)return youtubeChecked || pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
+                if(!debugImage)return youtubeChecked || pillHit || layoutQueued || Environment.GetEnvironmentVariable("CAPTURE_CHECK_FINGERPRINT") == "0" || File.Exists("/run/commercial-block/acr-fingerprint") ? 0 : 1;
             }
             try {
             // NV12 (BT.601) -> RGB, nearest-neighbour resample to 480x270.
@@ -328,7 +349,7 @@ internal static class Program
                 // Debug disk/encoding failures never invalidate recognition.
                 try{File.Delete(path);File.Delete(path+".tmp");}catch{}
                 Console.Error.WriteLine("debug_image_unavailable");
-                return youtubeChecked || pillHit || layoutQueued || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
+                return youtubeChecked || pillHit || layoutQueued || Environment.GetEnvironmentVariable("CAPTURE_CHECK_FINGERPRINT") == "0" || File.Exists("/run/commercial-block/acr-fingerprint")?0:1;
             }
         }
         finally

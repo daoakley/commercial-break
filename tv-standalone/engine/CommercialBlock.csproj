@@ -1,1 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>netcoreapp3.1</TargetFramework><UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="Program.cs"/><Compile Include="DebugRecords.cs"/><Compile Include="ThemeSettings.cs"/><Compile Include="EngineHealth.cs"/><Compile Include="YouTubeSkipGuard.cs"/><Compile Include="YouTubeDetectionPolicy.cs"/><Compile Include="YouTubeCountdownHold.cs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UseAppHost>false</UseAppHost>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="SamsungVerdict.cs" />
+    <Compile Include="RecognitionLane.cs" />
+    <Compile Include="SamsungRecognitionClient.cs" />
+    <Compile Include="DetectionPipeline.cs" />
+    <Compile Include="DetectionTiming.cs" />
+    <Compile Include="OverlayReceipt.cs" />
+    <Compile Include="DebugRecords.cs" />
+    <Compile Include="ThemeSettings.cs" />
+    <Compile Include="EngineHealth.cs" />
+    <Compile Include="YouTubeSkipGuard.cs" />
+    <Compile Include="YouTubeDetectionPolicy.cs" />
+    <Compile Include="YouTubeCountdownHold.cs" />
+  </ItemGroup>
+</Project>
