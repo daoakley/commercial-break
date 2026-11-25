@@ -9,7 +9,9 @@ partial class Program
     static DetectionTiming Timing;
     static object Build;
     static string SamsungError = "";
-    static bool RemoteNeedsMaskedCapture;
+    static readonly ArchiveContinuation Archive = new ArchiveContinuation();
+    static readonly MaskedLookPolicy MaskedLooks = new MaskedLookPolicy();
+    static long CoverExpiry => Math.Max(LastAd+8000, Archive.Enabled?Archive.Until:0);
     static long ActiveCaptureId, ActiveCaptureStarted, CoverCaptureId, CoverCaptureStarted;
     static bool CoverReceiptSeen;
 
@@ -40,7 +42,7 @@ partial class Program
     static void InvalidateRemote()
     {
         SamsungLane.Cancel();
-        RemoteNeedsMaskedCapture = false;
+        lock(Gate){Archive.ResetSession(); MaskedLooks.Reset();}
     }
 
     static void ObserveOverlay()
@@ -67,6 +69,7 @@ partial class Program
             ActiveCaptureStarted = session.Started;
             Timing.Record(captureId, DetectionStage.Accepted, session.Started);
             Matches++;
+            if(IsYouTubeTv(session.App))Archive.Strong(Now(),!Covered);
             LastAccepted = LastAd = Now();
             if (Covered && CoverSource == "audio-splice")
             {
@@ -141,10 +144,28 @@ partial class Program
             LastMatchSource = "samsung";
             AcceptAd(job.session, job.captureId);
         }
-        else if (Covered && job.keepCard)
+        else
         {
-            RemoteNeedsMaskedCapture = true;
-            Next = 0;
+            lock(Gate)
+            {
+                // Recheck immediately before renewing; a stale completion cannot restore a removed lease.
+                bool valid=job.session.Current(App(),Generation,NavigationAt(),DetectionTiming.Clock,Enabled&&!MaintenancePaused)
+                    && IsYouTubeTv(app) && !OtherActive() && !(ArtMode=="on"&&Now()-ArtObserved<6000);
+                if(valid)
+                {
+                    bool eligible=ArchiveContinuation.TryRead(result.Response,job.fingerprint.GetProperty("at").GetInt64().ToString(),out bool qualifies);
+                    long expiry=0;
+                    if(eligible)expiry=Archive.Observe(Now(),qualifies,Covered,LastAd+8000,File.Exists(State+"/overlay-lease"));
+                    else Archive.BreakSequence();
+                    if(expiry>0 && Covered && File.Exists(State+"/overlay-lease"))
+                    {
+                        // Encode the hard deadline in the existing independent eight-second watchdog lease.
+                        File.WriteAllText(State+"/overlay-lease",(expiry-8000).ToString());
+                        Timing.Record(job.captureId,DetectionStage.ContinuationRenewed,job.session.Started);
+                        Message="Commercial continuation matched";
+                    }
+                }
+            }
         }
         Record("reply", result.Ad ? "ad" : "unknown");
     }

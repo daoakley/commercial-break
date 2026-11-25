@@ -177,10 +177,18 @@ internal static class Program
             byte[] layoutRgb = null;
             bool layoutQueued=false;
             bool returnAcknowledged=true;
+            bool cardPaused=false;
+            bool panelRestored=true;
             try
             {
                 if (cardActive)
                 {
+                    // An already blanked/unknown panel is not ours to adopt. Leave the card and lease alone.
+                    if(!PanelMaskWanted() || LfdPanelMute()!=0)
+                    {
+                        Console.Error.WriteLine("panel_mask_deferred");
+                        return 75;
+                    }
                     // 1. Blank the physical panel (only while this app owns the cover), wait for it to go dark.
                     if (PanelMaskWanted() && LfdPanelMute() == 0)
                     {
@@ -202,6 +210,7 @@ internal static class Program
                     File.Delete(ackFile);
                     uncovered.Start();
                     File.WriteAllText(pauseFile, "pause");
+                    cardPaused=true;
                     for (int i = 0; !File.Exists(ackFile) && i < 100; i++) Thread.Sleep(10);
                     if (!File.Exists(ackFile))
                     {
@@ -254,11 +263,11 @@ internal static class Program
                         File.Move(pathResult+".tmp",pathResult,true);youtubeHit=result.hit;youtubeChecked=true;
                     } catch { /* A local check failure falls back to Samsung recognition. */ }
                 }
-                if (rc == 0 && !youtubeOnly && !pillHit && !youtubeHit && Environment.GetEnvironmentVariable("CAPTURE_CHECK_FINGERPRINT") != "0") SecureFingerprint.TryCaptureDue(imageAt);
+
             }
             finally
             {
-                if (cardActive)
+                if (cardPaused)
                 {
                     // 4. Card back, wait for its acknowledgement, then the return margin, then panel on.
                     File.Delete(pauseFile);
@@ -279,18 +288,21 @@ internal static class Program
                     int panel = LfdPanelMute();
                     if (panel == 1 && SetLfdPanelMute(0)) panel = LfdPanelMute();
                     if (masked.IsRunning) masked.Stop();
+                    panelRestored=panel==0;
                     // Unknown or still-muted state: leave the timed rescue alive.
                     if (panel == 0) File.Delete(PanelOwned);
                     if (panel == 0 && !rescue.HasExited) { try { rescue.Kill(); } catch (InvalidOperationException) { } }
                     rescue.Dispose();
                 }
             }
-            if (!returnAcknowledged)
+            if (!returnAcknowledged || !panelRestored)
             {
                 Console.Error.WriteLine("overlay_return_timeout");
                 Console.WriteLine("rc=-103 width=0 height=0 backend=acr");
                 return 1;
             }
+            // Secure acquisition has its own timestamp and does not need the picture/card exposed.
+            if (rc == 0 && !youtubeOnly && !pillHit && !youtubeHit && Environment.GetEnvironmentVariable("CAPTURE_CHECK_FINGERPRINT") != "0") SecureFingerprint.TryCaptureDue(imageAt);
             int width = Marshal.ReadInt32(parameter, 0x08), height = Marshal.ReadInt32(parameter, 0x0c), pitch = Marshal.ReadInt32(parameter, 0x2c);
             if (rc != 0)
             {

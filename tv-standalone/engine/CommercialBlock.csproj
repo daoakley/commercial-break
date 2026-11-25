@@ -11,6 +11,7 @@
     <Compile Include="RecognitionLane.cs" />
     <Compile Include="SamsungRecognitionClient.cs" />
     <Compile Include="DetectionPipeline.cs" />
+    <Compile Include="ArchiveContinuation.cs" />
     <Compile Include="DetectionTiming.cs" />
     <Compile Include="OverlayReceipt.cs" />
     <Compile Include="DebugRecords.cs" />

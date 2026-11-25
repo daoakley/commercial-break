@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-internal enum DetectionStage { CaptureStarted, CaptureFinished, LocalPositive, RemoteSubmitted, RemoteFinished, RemoteError, Accepted, CoverRequested, MuteCompleted, WindowShown, Released, Discarded }
+internal enum DetectionStage { CaptureStarted, CaptureFinished, LocalPositive, RemoteSubmitted, RemoteFinished, RemoteError, Accepted, CoverRequested, MuteCompleted, WindowShown, Released, Discarded, ContinuationRenewed, CaptureDeferred }
 
 // Bounded, scalar-only diagnostics. Capture/control paths enqueue; maintenance flushes.
 internal sealed class DetectionTiming

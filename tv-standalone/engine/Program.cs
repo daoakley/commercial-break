@@ -192,7 +192,7 @@ partial class Program {
  }
  static bool OtherActive(){try{return Now()-long.Parse(File.ReadAllText("/run/codex-commercial-muter/heartbeat").Trim())*1000<60000;}catch{return false;}}
  static string App(){try {string s=Run("/usr/bin/vconftool","get memory/appfw/current_fullscreen_appid");var i=s.IndexOf("value = ");return i<0?"":s.Substring(i+8).Split(' ')[0];}catch{return "";}}
- static void Release(string reason="reset"){lock(Gate){if(Covered)Timing?.Record(CoverCaptureId,DetectionStage.Released,CoverCaptureStarted);RemoteNeedsMaskedCapture=false;if(Covered&&CoverSource=="audio-splice"&&!AudioCoverConfirmed){LastUnconfirmedAudioAt=Now();AudioUnconfirmed++;Record("audio-unconfirmed","audio cover released after "+(Now()-CoverSince)+" ms without confirmation; cool-down "+AudioSetting("audio-cooldown",300,0,3600)+" s");}if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;CoverSource="none";Countdown.Reset();Next=0;Themes?.EndBreak();}}
+ static void Release(string reason="reset"){lock(Gate){if(Covered)Timing?.Record(CoverCaptureId,DetectionStage.Released,CoverCaptureStarted);if(Covered)Archive.Released(Now());MaskedLooks.Reset();if(Covered&&CoverSource=="audio-splice"&&!AudioCoverConfirmed){LastUnconfirmedAudioAt=Now();AudioUnconfirmed++;Record("audio-unconfirmed","audio cover released after "+(Now()-CoverSince)+" ms without confirmation; cool-down "+AudioSetting("audio-cooldown",300,0,3600)+" s");}if(Covered||OwnMute)Record("release",reason);if(CoverSince>0){BreakHistory.Enqueue(new{start=CoverSince,end=Now(),durationSeconds=(Now()-CoverSince)/1000.0,endReason=reason,source="app cover intervals; not confirmed ad boundaries"});while(BreakHistory.Count>12)BreakHistory.Dequeue();CoverSince=0;}File.Delete(State+"/overlay-lease");File.Delete(State+"/overlay-pause");if(OwnMute&&!File.Exists(State+"/owned-mute"))OwnMute=false;if(OwnMute){try{Run("/usr/bin/busctl","--system --timeout=2 call org.tizen.speakermanager /Org/Tizen/SpeakerManagerInternal org.tizen.speakermanager SetSpeakerMute b false");OwnMute=false;File.Delete(State+"/owned-mute");}catch{}}Covered=false;LastAd=0;CoverSource="none";Countdown.Reset();Next=0;Themes?.EndBreak();}}
  static Process Spawn(string file,string args){return Process.Start(new ProcessStartInfo(file,args){UseShellExecute=false});}
  static Process SpawnScript(string script){var info=new ProcessStartInfo("/bin/sh"){UseShellExecute=false};info.ArgumentList.Add("-c");info.ArgumentList.Add(script);return Process.Start(info);}
  static void Prepare(){
@@ -248,9 +248,9 @@ partial class Program {
    if(ticket!=null)p.StartInfo.Environment["CAPTURE_DEBUG_ID"]=ticket.id;
    p.StartInfo.Environment["CAPTURE_OVERLAY_PAUSE_FILE"]=Covered?State+"/overlay-pause":"";
    p.StartInfo.Environment["CAPTURE_OVERLAY_ACK_FILE"]=Covered?State+"/overlay-paused-ack":"";
-   p.Start();var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();if(!p.WaitForExit(4000)){try{p.Kill();}catch{}throw new TimeoutException();}if(p.ExitCode!=0)throw new IOException("capture unavailable");
+   p.Start();var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();if(!p.WaitForExit(4000)){try{p.Kill();}catch{}throw new TimeoutException();}if(p.ExitCode==75){MaskedLooks.Complete(true);Stage="capture-deferred";Timing.Record(captureId,DetectionStage.CaptureDeferred,session.Started);if(debug!=null)debug.verdict="not_queried_safe_deferral";return false;}if(p.ExitCode!=0)throw new IOException("capture unavailable");
   }
-  Timing.Record(captureId,DetectionStage.CaptureFinished,session.Started);LastError="";
+  Timing.Record(captureId,DetectionStage.CaptureFinished,session.Started);if(CaptureMode=="panel-masked")MaskedLooks.Complete(false);LastError="";
   if(debug!=null){try{debug.diagnostics=JsonDocument.Parse(File.ReadAllText(State+"/capture-diagnostics.json")).RootElement.Clone();}catch{}}
   try {
    var local=JsonDocument.Parse(File.ReadAllText(State+"/youtube-ui.json")).RootElement.Clone();
@@ -363,7 +363,7 @@ partial class Program {
     lock(Gate)
     {
      bool timerLease=IsRegularYouTube(app)&&Countdown.KeepsCovered(Now());
-     if(Covered&&(!File.Exists(State+"/overlay-lease")||(!timerLease&&Now()-LastAd>=8000)))Release("ad renewal expired or lease removed");
+     if(Covered&&(!File.Exists(State+"/overlay-lease")||(!timerLease&&Now()>=CoverExpiry)))Release("ad renewal expired or lease removed");
      if(Covered&&timerLease)
      {
       File.WriteAllText(State+"/overlay-lease",Now().ToString());
@@ -373,7 +373,7 @@ partial class Program {
     FinishRemote(true,app);
     // A covered Samsung check can finish without repeatedly dropping its card.
     // Uncovered local checks continue even while a remote operation is pending.
-    if(Covered&&IsYouTubeTv(app)&&SamsungLane.Busy&&!RemoteNeedsMaskedCapture)
+    if(Covered&&IsYouTubeTv(app)&&SamsungLane.Busy)
     {
      await Task.Delay(50);continue;
     }
@@ -384,9 +384,8 @@ partial class Program {
     var session=new EvidenceSession{App=app,Generation=Generation,Navigation=NavigationAt(),Started=DetectionTiming.Clock};
     long captureId=Timing.Begin();
     lock(Gate){if(MaintenancePaused||!Enabled)continue;RecognitionInProgress=true;}
-    bool steady=Covered&&IsYouTubeTv(app)&&!RemoteNeedsMaskedCapture&&SamsungLane.Ready(DetectionTiming.Clock);
+    bool steady=Covered&&IsYouTubeTv(app)&&!MaskedLooks.Begin(Now(),CoverExpiry);
     if(Covered&&IsYouTubeTv(app)&&!steady)MaskedFallbacks++;
-    RemoteNeedsMaskedCapture=false;
     Timing.Record(captureId,DetectionStage.CaptureStarted,session.Started);
     bool ad=await Recognize(session,captureId,steady);
     failures=0;
@@ -413,7 +412,7 @@ partial class Program {
    }
   }
  }
- static object Status()=>new{build=Build,timing=Timing?.Status(),samsungLane=SamsungLane.Status(DetectionTiming.Clock),samsungError=SamsungError,health=Health?.Status(),enabled=Enabled,maintenancePaused=MaintenancePaused,recognitionInProgress=RecognitionInProgress,covered=Covered,otherActive=OtherActive(),message=Message,stage=Stage,lastError=LastError,lastAcceptedAt=LastAccepted,covers=Covers,captureMode=CaptureMode,steadyCardMatches=SteadyCardMatches,maskedFallbacks=MaskedFallbacks,queries=Queries,matches=Matches,foregroundApp=LastApp,supportedApp=IsSupportedApp(LastApp),engine="YouTube: local countdown/Skip only; YouTube TV: Samsung + broadcast rules",samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),checkTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),youtubeUi=new{checks=YouTubeChecks,hits=YouTubeHits,state=LastYouTubeUi,lastMillis=LastYouTubeMillis,automaticSkip=YouTubeAutoSkip,skipAttempts=YouTubeSkipAttempts,skipStatus=YouTubeSkipStatus,lastSkipAttemptAt=SkipGuard?.LastAttempt,countdown=new{seconds=Countdown.Seconds,maxSeconds=Countdown.MaxSeconds,holding=Covered&&Countdown.Waiting(Now()),checkAt=Countdown.CheckAt,checkInMs=Covered?Math.Max(0,Countdown.CheckAt-Now()):0,holds=CountdownHolds}},layout=new{enabled=LayoutEnabled,checks=LayoutChecks,hits=LayoutHits,lastScore=LastLayoutScore,lastMillis=LastLayoutMillis,lastModel=LastLayoutModel,error=LayoutError,threshold=0.5,experimental=true},localChecks=LocalChecks,localHits=LocalHits,lastPillScore=LastPillScore,lastPillMillis=LastPillMillis,lastMatchSource=LastMatchSource,releaseSeconds=8,persistentApp=true,rebootReady=false,audio=new{mode=AudioMode,shadow=AudioMode==1,triggers=AudioTriggers,covers=AudioCovers,lastTriggerAt=LastAudioTriggerAt==0?(long?)null:LastAudioTriggerAt,tapSilent=AudioSilent,lastStateAt=LastAudioStateAt==0?(long?)null:LastAudioStateAt,observerAlive=Audio!=null&&!Audio.HasExited,error=AudioError,floorDb=AudioFloor(),quietSeconds=AudioSetting("audio-quiet",60,0,3600),cooldownSeconds=AudioSetting("audio-cooldown",300,0,3600),unconfirmed=AudioUnconfirmed,suppressed=AudioSuppressed,armSeconds=AudioSetting("audio-arm",5,1,30),arms=AudioArms,armHits=AudioArmHits,armed=Now()<AudioArmedUntil,rule="null 60-1500 ms at or below floor, then non-mono audio; decision 1 s after the null"},appearance=new{theme=Themes?.Selected??"default",effectiveTheme=Themes?.EffectiveTheme??"default",activeTheme=Covered?CoverTheme:null},debug=Debug?.Status()};
+ static object Status()=>new{continuation=Archive.Status(),maskedLooks=new{total=MaskedLooks.Looks,deferred=MaskedLooks.Deferrals},build=Build,timing=Timing?.Status(),samsungLane=SamsungLane.Status(DetectionTiming.Clock),samsungError=SamsungError,health=Health?.Status(),enabled=Enabled,maintenancePaused=MaintenancePaused,recognitionInProgress=RecognitionInProgress,covered=Covered,otherActive=OtherActive(),message=Message,stage=Stage,lastError=LastError,lastAcceptedAt=LastAccepted,covers=Covers,captureMode=CaptureMode,steadyCardMatches=SteadyCardMatches,maskedFallbacks=MaskedFallbacks,queries=Queries,matches=Matches,foregroundApp=LastApp,supportedApp=IsSupportedApp(LastApp),engine="YouTube: local countdown/Skip only; YouTube TV: Samsung + broadcast rules",samsungRecognition=YouTubeDetectionPolicy.UsesSamsung(LastApp),checkTargetMs=YouTubeDetectionPolicy.IntervalMs(LastApp),youtubeUi=new{checks=YouTubeChecks,hits=YouTubeHits,state=LastYouTubeUi,lastMillis=LastYouTubeMillis,automaticSkip=YouTubeAutoSkip,skipAttempts=YouTubeSkipAttempts,skipStatus=YouTubeSkipStatus,lastSkipAttemptAt=SkipGuard?.LastAttempt,countdown=new{seconds=Countdown.Seconds,maxSeconds=Countdown.MaxSeconds,holding=Covered&&Countdown.Waiting(Now()),checkAt=Countdown.CheckAt,checkInMs=Covered?Math.Max(0,Countdown.CheckAt-Now()):0,holds=CountdownHolds}},layout=new{enabled=LayoutEnabled,checks=LayoutChecks,hits=LayoutHits,lastScore=LastLayoutScore,lastMillis=LastLayoutMillis,lastModel=LastLayoutModel,error=LayoutError,threshold=0.5,experimental=true},localChecks=LocalChecks,localHits=LocalHits,lastPillScore=LastPillScore,lastPillMillis=LastPillMillis,lastMatchSource=LastMatchSource,releaseSeconds=8,persistentApp=true,rebootReady=false,audio=new{mode=AudioMode,shadow=AudioMode==1,triggers=AudioTriggers,covers=AudioCovers,lastTriggerAt=LastAudioTriggerAt==0?(long?)null:LastAudioTriggerAt,tapSilent=AudioSilent,lastStateAt=LastAudioStateAt==0?(long?)null:LastAudioStateAt,observerAlive=Audio!=null&&!Audio.HasExited,error=AudioError,floorDb=AudioFloor(),quietSeconds=AudioSetting("audio-quiet",60,0,3600),cooldownSeconds=AudioSetting("audio-cooldown",300,0,3600),unconfirmed=AudioUnconfirmed,suppressed=AudioSuppressed,armSeconds=AudioSetting("audio-arm",5,1,30),arms=AudioArms,armHits=AudioArmHits,armed=Now()<AudioArmedUntil,rule="null 60-1500 ms at or below floor, then non-mono audio; decision 1 s after the null"},appearance=new{theme=Themes?.Selected??"default",effectiveTheme=Themes?.EffectiveTheme??"default",activeTheme=Covered?CoverTheme:null},debug=Debug?.Status()};
  static async Task Serve(){var h=new HttpListener();h.Prefixes.Add("http://127.0.0.1:18764/");h.Start();while(true){var c=await h.GetContextAsync();try{
   c.Response.Headers.Add("Access-Control-Allow-Origin","*");c.Response.Headers.Add("Access-Control-Allow-Methods","GET, POST, OPTIONS");c.Response.Headers.Add("Access-Control-Allow-Headers","Authorization, Content-Type");
   if(c.Request.HttpMethod=="OPTIONS"){c.Response.StatusCode=204;c.Response.Close();continue;}
@@ -426,6 +425,15 @@ partial class Program {
    if(c.Request.ContentLength64<1||c.Request.ContentLength64>128){c.Response.StatusCode=400;c.Response.Close();continue;}
    var body=JsonDocument.Parse(await new StreamReader(c.Request.InputStream).ReadToEndAsync()).RootElement;
    lock(Gate){Themes.Set(body.GetProperty("theme").GetString());}
+  }else if(c.Request.Url.AbsolutePath=="/continuation"&&c.Request.HttpMethod=="POST"){
+   if(c.Request.ContentLength64<1||c.Request.ContentLength64>128){c.Response.StatusCode=400;c.Response.Close();continue;}
+   var body=JsonDocument.Parse(await new StreamReader(c.Request.InputStream).ReadToEndAsync()).RootElement;
+   lock(Gate){bool value=body.GetProperty("enabled").GetBoolean();
+    File.WriteAllText(Home+"/archive-continuation-enabled.tmp",value?"1":"0");File.Move(Home+"/archive-continuation-enabled.tmp",Home+"/archive-continuation-enabled",true);
+    Archive.Enabled=value;Archive.ResetSession();Generation++;
+    if(Covered&&Now()-LastAd>=8000)Release("continuation setting changed");
+    else if(Covered&&File.Exists(State+"/overlay-lease"))File.WriteAllText(State+"/overlay-lease",LastAd.ToString());
+   }
   }else if(c.Request.Url.AbsolutePath=="/layout"&&c.Request.HttpMethod=="POST"){
    if(c.Request.ContentLength64<1||c.Request.ContentLength64>128){c.Response.StatusCode=400;c.Response.Close();continue;}
    var body=JsonDocument.Parse(await new StreamReader(c.Request.InputStream).ReadToEndAsync()).RootElement;
@@ -457,6 +465,7 @@ partial class Program {
   if(args.Length==3&&args[0]=="--classify"){Console.WriteLine(IsAd(JsonDocument.Parse(File.ReadAllText(args[1])).RootElement,args[2])?"ad":"uncertain");return 0;}
   if(args.Length==2&&args[0]=="--replay"){foreach(var item in JsonDocument.Parse(File.ReadAllText(args[1])).RootElement.EnumerateArray())Console.WriteLine(IsAd(item.GetProperty("response"),item.GetProperty("at").GetString())?"ad":"uncertain");return 0;}
   Health=new EngineHealth(Home,State);Timing=new DetectionTiming(Home);Build=DetectionTiming.BuildIdentity();
+  try{Archive.Enabled=File.ReadAllText(Home+"/archive-continuation-enabled").Trim()=="1";}catch{Archive.Enabled=false;}
   SkipGuard=new YouTubeSkipGuard(ReadSkipAttempt());try{YouTubeAutoSkip=File.ReadAllText(Home+"/youtube-skip-enabled").Trim()=="1";}catch{}YouTubeSkipStatus=YouTubeAutoSkip?"ready":"off";
   AppDomain.CurrentDomain.UnhandledException+=(sender,eventArgs)=>Health.Error("unhandled",eventArgs.ExceptionObject as Exception);
   bool acquired=false;

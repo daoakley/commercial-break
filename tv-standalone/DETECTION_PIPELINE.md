@@ -34,18 +34,49 @@ App/navigation identity does not establish a channel or program title.
 
 ## Covered checks
 
-YouTube TV first tries a secure fingerprint with the card visible. A current
-unknown reply schedules the masked fallback. A pending covered request does not
-cause repeated card drops. During Samsung backoff the local masked checks remain
-available. Regular YouTube keeps its local countdown/Skip path and bounded timer
-hold. Samsung no-match never means that programming has definitely resumed.
+YouTube TV keeps secure fingerprint checks behind the visible card. A masked
+look for local Sponsored/layout evidence is scheduled in the final 2.5 seconds
+of the current lease, at most once per renewal. A safely deferred look may retry
+once, with at least 500 ms spacing and 1.2 seconds of lease remaining. The same
+budget applies during Samsung backoff. Uncovered cadence is unchanged. Regular
+YouTube keeps its local countdown/Skip path and bounded timer hold.
 
-Masked capture requires verified physical-panel blanking before hiding the card.
-If blanking fails, the helper aborts without intentionally dropping the card.
-If the card-return acknowledgement fails, the helper leaves its independent
-four-second panel rescue alive instead of immediately exposing the picture.
-No failed sample renews a cover. These controls depend on the target firmware;
-physical blackout and cleanup require hardware validation.
+An already blanked or unreadable panel causes the optional look to defer without
+hiding the card, adopting another owner's panel state, or renewing the lease.
+Actual capture/control failures retain fail-open recovery. Masked acquisition
+requires verified blanking; secure fingerprint work runs only after card/panel
+restoration. The independent panel rescue remains bounded. A failed sample never
+renews a cover; expiry and navigation still release it.
+
+### Optional archive continuation
+
+Authenticated `POST /continuation` with `{"enabled":true}` enables a persisted,
+default-off experiment for YouTube TV. `{"enabled":false}` turns it off. `/status`
+exposes its setting, baseline and scalar counters. This setting does not add AI
+or a computer dependency.
+
+Only an exact, fresh, same-session matched frame with integer distance 0..15 and
+four nonnegative integer match counts is eligible. The third count must be at
+least two and exceed the second. These are empirical reply fields, not documented
+proof that the content is an advertisement. Queries remain single-frame.
+
+Qualifying evidence can renew an existing, unexpired owned cover; it can never
+start or resurrect one. Each renewal lasts at most eight seconds and is clipped
+to 45 seconds after the last typed AD or validated local positive. Repeat evidence
+does not reset that strong-positive budget. The independent watchdog receives
+the same clipped expiry.
+
+The guard requires at least 40 mature eligible uncovered observations, retaining
+only the last 200. Observations mature after 60 seconds; pending observations are
+discarded on cover start, and the 60 seconds after release are excluded. The
+qualifying share must be at most 5% when the cover starts. This baseline is frozen
+for that cover and reset on session invalidation. Insufficient baseline means no
+additional continuation. Standard eight-second behavior remains the fallback.
+
+`continuation` counters distinguish qualifying replies, actual/potential renewals,
+budget/baseline rejections and consecutive uncovered candidates. `maskedLooks`
+counts looks and safe deferrals. These diagnostics do not establish accuracy;
+new channels, recordings and program types require independent validation.
 
 ## Samsung evidence validation
 
